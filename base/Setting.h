@@ -108,20 +108,11 @@ INT getValidTotal() {
 */
 
 INT bernFlag = 0;
-//EDIT
-INT constrainFlag = 0;
 
 extern "C"
 void setBern(INT con) {
 	bernFlag = con;
 }
-
-//EDIT
-extern "C"
-void setConstrainFlag(INT con) {
-	constrainFlag = con;
-}
-
 
 
 #endif

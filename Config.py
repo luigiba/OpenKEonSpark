@@ -2,12 +2,11 @@
 import numpy as np
 import tensorflow as tf
 import os
-import time
-import datetime
 import ctypes
 import json
-#EDIT
 import sys
+import threading
+import time
 
 class Config(object):
     '''
@@ -15,35 +14,35 @@ class Config(object):
     '''
     #EDIT
     def __init__(self, cpp_lib_path=None, init_new_entities=False):
-        #EDIT
         self.init_new_entities = init_new_entities
 
         if init_new_entities == False:
-            # base_file = os.path.abspath(os.path.join(os.path.dirname(__file__), '../release/Base.so'))
-            #TODO: add main_spark parameter
             if cpp_lib_path == None:
-                cpp_lib_path = '/home/luigi/IdeaProjects/OpenKE_new_Spark/release/Base.so'
+                cpp_lib_path = '/home/luigi/IdeaProjects/OpenKEonSpark/release/Base.so'
             base_file = os.path.abspath(cpp_lib_path)
-
             self.lib = ctypes.cdll.LoadLibrary(base_file)
             self.lib.sampling.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int64, ctypes.c_int64, ctypes.c_int64]
-            self.lib.getHeadBatch.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
-            self.lib.getTailBatch.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
-            self.lib.testHead.argtypes = [ctypes.c_void_p]
-            self.lib.testTail.argtypes = [ctypes.c_void_p]
+
+            #link prediction
+            self.lib.getTailBatch.argtypes = [ctypes.c_int64, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+            self.lib.testTail.argtypes = [ctypes.c_int64, ctypes.c_void_p]
+            self.lib.testTail.restype = ctypes.POINTER(ctypes.c_int64 * 4)
+            self.lib.getHeadBatch.argtypes = [ctypes.c_int64, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+            self.lib.testHead.argtypes = [ctypes.c_int64, ctypes.c_void_p]
+            self.lib.testHead.restype = ctypes.POINTER(ctypes.c_int64 * 4)
+            self.test_head = 0
+
+            #triple classification
             self.lib.getTestBatch.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
             self.lib.getValidBatch.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
             self.lib.getBestThreshold.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
             self.lib.test_triple_classification.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
-            self.test_flag = False
+
             self.in_path = None
+            self.test_log_path = None
             self.out_path = None
             self.bern = 0
-
-            #EDIT
-            self.constrainFlag = 0
-
-            self.hidden_size = 100
+            self.hidden_size = 64
             self.ent_size = self.hidden_size
             self.rel_size = self.hidden_size
             self.train_times = 0
@@ -63,7 +62,6 @@ class Config(object):
             self.test_link_prediction = False
             self.test_triple_classification = False
             self.valid_triple_classification = False
-            self.early_stopping = None # It expects a tuple of the following: (patience, min_delta)
 
     def init_link_prediction(self):
         r'''
@@ -71,12 +69,9 @@ class Config(object):
         '''
         self.lib.importTestFiles()
         self.lib.importTypeFiles()
-        self.test_h = np.zeros(self.lib.getEntityTotal(), dtype = np.int64)
-        self.test_t = np.zeros(self.lib.getEntityTotal(), dtype = np.int64)
-        self.test_r = np.zeros(self.lib.getEntityTotal(), dtype = np.int64)
-        self.test_h_addr = self.test_h.__array_interface__['data'][0]
-        self.test_t_addr = self.test_t.__array_interface__['data'][0]
-        self.test_r_addr = self.test_r.__array_interface__['data'][0]
+        self.N_THREADS_LP = 10
+        self.lp_res = []
+        for _ in range(self.N_THREADS_LP): self.lp_res.append({})
 
     def init_triple_classification(self):
         r'''
@@ -85,8 +80,6 @@ class Config(object):
         self.lib.importTestFiles()
         self.lib.importTypeFiles()
 
-
-        #EDIT
         self.acc = np.zeros(1, dtype = np.float32)
         self.acc_addr = self.acc.__array_interface__['data'][0]
 
@@ -119,7 +112,7 @@ class Config(object):
         self.relThresh = np.zeros(self.lib.getRelationTotal(), dtype = np.float32)
         self.relThresh_addr = self.relThresh.__array_interface__['data'][0]
 
-    #EDIT
+
     def init_valid_triple_classification(self):
         self.lib.importTestFiles()
         self.lib.importTypeFiles()
@@ -147,34 +140,23 @@ class Config(object):
 
     # prepare for train and test
     def init(self):
-        #EDIT
         if self.init_new_entities == False:
-
             self.trainModel = None
             if self.in_path != None:
                 self.lib.setInPath(ctypes.create_string_buffer(self.in_path.encode(), len(self.in_path) * 2))
                 self.lib.setBern(self.bern)
-
-                #EDIT
-                self.lib.setConstrainFlag(self.constrainFlag)
-
                 self.lib.setWorkThreads(self.workThreads)
                 self.lib.randReset()
                 self.lib.importTrainFiles()
                 self.relTotal = self.lib.getRelationTotal()
                 self.entTotal = self.lib.getEntityTotal()
-
-                #EDIT
-                # self.trainTotal = self.lib.getTrainTotal()
                 self.trainTotal = self.lib.getTrainTotal_()
-
                 self.testTotal = self.lib.getTestTotal()
                 self.validTotal = self.lib.getValidTotal()
-
-                #EDIT
-                # self.batch_size = int(self.lib.getTrainTotal() / self.nbatches)
                 self.bt = self.lib.getBatchTotal()
+
                 tot = None
+
                 if self.bt > 0:
                     tot = self.bt
                 else:
@@ -191,7 +173,6 @@ class Config(object):
                 print("Batch size is {}".format(self.batch_size))
                 print("Number of batches: {}".format(self.nbatches))
 
-
                 self.batch_seq_size = self.batch_size * (1 + self.negative_ent + self.negative_rel)
                 self.batch_h = np.zeros(self.batch_size * (1 + self.negative_ent + self.negative_rel), dtype = np.int64)
                 self.batch_t = np.zeros(self.batch_size * (1 + self.negative_ent + self.negative_rel), dtype = np.int64)
@@ -207,9 +188,11 @@ class Config(object):
                 self.init_link_prediction()
             if self.test_triple_classification:
                 self.init_triple_classification()
-            #EDIT
             if self.valid_triple_classification:
                 self.init_valid_triple_classification()
+
+    def set_test_log_path(self, p):
+        self.test_log_path = p
 
     def get_ent_total(self):
         return self.entTotal
@@ -232,7 +215,6 @@ class Config(object):
     def set_test_triple_classification(self, flag):
         self.test_triple_classification = flag
 
-    #EDIT
     def set_valid_triple_classification(self, flag):
         self.valid_triple_classification = flag
 
@@ -251,9 +233,8 @@ class Config(object):
     def set_bern(self, bern):
         self.bern = bern
 
-    #EDIT
-    def set_constrain_flag(self, constrainFlag):
-        self.constrainFlag = constrainFlag
+    def set_test_head(self, test_head):
+        self.test_head = test_head
 
     def set_dimension(self, dim):
         self.hidden_size = dim
@@ -275,9 +256,6 @@ class Config(object):
     def set_margin(self, margin):
         self.margin = margin
 
-    # def set_work_threads(self, threads):
-    #     self.workThreads = threads
-
     def set_ent_neg_rate(self, rate):
         self.negative_ent = rate
 
@@ -294,9 +272,6 @@ class Config(object):
     def set_export_steps(self, steps):
         self.export_steps = steps
 
-    def set_early_stopping(self, early_stopping):
-        self.early_stopping = early_stopping
-
     # call C function for sampling
     def sampling(self):
         self.lib.sampling(self.batch_h_addr, self.batch_t_addr, self.batch_r_addr, self.batch_y_addr, self.batch_size, self.negative_ent, self.negative_rel)
@@ -307,7 +282,6 @@ class Config(object):
             with self.sess.as_default():
                 self.saver.save(self.sess, self.exportName)
 
-    #EDIT
     def save_tensorflow_weights(self, export_name=None, write_meta_graph=False):
         if export_name == None:
             export_name = self.exportName
@@ -315,7 +289,6 @@ class Config(object):
             with self.sess.as_default():
                 self.saver.save(self.sess, export_name, write_meta_graph=write_meta_graph, write_state=False)
 
-    # restore model
     def restore_tensorflow(self):
         with self.graph.as_default():
             with self.sess.as_default():
@@ -376,37 +349,10 @@ class Config(object):
         for i in lists:
             self.set_parameters_by_name(i, lists[i])
 
-    #EDIT
-    # def set_model(self, model):
-    # 	self.model = model
-    # 	self.graph = tf.Graph()
-    # 	with self.graph.as_default():
-    # 		self.sess = tf.Session()
-    # 		with self.sess.as_default():
-    # 			initializer = tf.contrib.layers.xavier_initializer(uniform = True)
-    # 			with tf.variable_scope("model", reuse=None, initializer = initializer):
-    # 				self.trainModel = self.model(config = self)
-    # 				if self.optimizer != None:
-    # 					pass
-    # 				elif self.opt_method == "Adagrad" or self.opt_method == "adagrad":
-    # 					self.optimizer = tf.train.AdagradOptimizer(learning_rate = self.alpha, initial_accumulator_value=1e-20)
-    # 				elif self.opt_method == "Adadelta" or self.opt_method == "adadelta":
-    # 					self.optimizer = tf.train.AdadeltaOptimizer(self.alpha)
-    # 				elif self.opt_method == "Adam" or self.opt_method == "adam":
-    # 					self.optimizer = tf.train.AdamOptimizer(self.alpha)
-    # 				else:
-    # 					self.optimizer = tf.train.GradientDescentOptimizer(self.alpha)
-    # 				grads_and_vars = self.optimizer.compute_gradients(self.trainModel.loss)
-    # 				self.train_op = self.optimizer.apply_gradients(grads_and_vars)
-    # 			self.saver = tf.train.Saver()
-    # 			self.sess.run(tf.global_variables_initializer())
-
-
     def set_model(self, model):
         self.model = model
 
 
-    #EDIT
     def import_model(self, ckpt):
         self.graph = tf.Graph()
         with self.graph.as_default():
@@ -417,7 +363,7 @@ class Config(object):
                 print("Importing variables...")
                 self.saver.restore(self.sess, ckpt)
 
-    #EDIT
+
     def set_model_and_session(self, model):
         self.model = model
         self.graph = tf.Graph()
@@ -452,42 +398,250 @@ class Config(object):
         return predict
 
 
-    #EDIT
-    # def run(self):
-    # 	with self.graph.as_default():
-    # 		with self.sess.as_default():
-    # 			if self.importName != None:
-    # 				self.restore_tensorflow()
-    # 			if self.early_stopping is not None:
-    # 				patience, min_delta = self.early_stopping
-    # 				best_loss = np.finfo('float32').max
-    # 				wait_steps = 0
-    # 			for times in range(self.train_times):
-    # 				loss = 0.0
-    # 				t_init = time.time()
-    # 				for batch in range(self.nbatches):
-    # 					self.sampling()
-    # 					loss += self.train_step(self.batch_h, self.batch_t, self.batch_r, self.batch_y)
-    # 				t_end = time.time()
-    # 				if self.log_on:
-    # 					print('Epoch: {}, loss: {}, time: {}'.format(times, loss, (t_end - t_init)))
-    # 				if self.exportName != None and (self.export_steps!=0 and times % self.export_steps == 0):
-    # 					self.save_tensorflow()
-    # 				if self.early_stopping is not None:
-    # 					if loss + min_delta < best_loss:
-    # 						best_loss = loss
-    # 						wait_steps = 0
-    # 					elif wait_steps < patience:
-    # 						wait_steps += 1
-    # 					else:
-    # 						print('Early stopping. Losses have not been improved enough in {} times'.format(patience))
-    # 						break
-    # 			if self.exportName != None:
-    # 				self.save_tensorflow()
-    # 			if self.out_path != None:
-    # 				self.save_parameters(self.out_path)
+
+    def test_lp_range(self, index, lef, rig):
+        l1_filter_tot = l1_tot = r1_tot = r1_filter_tot = l_tot = r_tot = l_filter_rank = l_rank = l_filter_reci_rank = l_reci_rank = 0.0
+        l3_filter_tot = l3_tot = r3_tot = r3_filter_tot = l_filter_tot = r_filter_tot = r_filter_rank = r_rank = r_filter_reci_rank = r_reci_rank = 0.0
+
+        #TYPE_C
+        l1_filter_tot_constrain = l1_tot_constrain = r1_tot_constrain = r1_filter_tot_constrain = l_tot_constrain = r_tot_constrain = l_filter_rank_constrain = l_rank_constrain = l_filter_reci_rank_constrain = l_reci_rank_constrain = 0.0
+        l3_filter_tot_constrain = l3_tot_constrain = r3_tot_constrain = r3_filter_tot_constrain = l_filter_tot_constrain = r_filter_tot_constrain = r_filter_rank_constrain = r_rank_constrain = r_filter_reci_rank_constrain = r_reci_rank_constrain = 0.0
 
 
+        test_h = np.zeros(self.lib.getEntityTotal(), dtype = np.int64)
+        test_t = np.zeros(self.lib.getEntityTotal(), dtype = np.int64)
+        test_r = np.zeros(self.lib.getEntityTotal(), dtype = np.int64)
+        test_h_addr = test_h.__array_interface__['data'][0]
+        test_t_addr = test_t.__array_interface__['data'][0]
+        test_r_addr = test_r.__array_interface__['data'][0]
+
+        print("Test link prediction range from {} to {}".format(lef, rig-1))
+
+        if os.path.exists(self.test_log_path+"thread"+str(index)):
+            with open(self.test_log_path+"thread"+str(index), 'r') as f:
+                last_i = int(f.readline())
+                print("Restoring test results from index {}".format(last_i))
+
+                lef = last_i + 1
+
+                r_filter_tot = float(f.readline())
+                r_tot = float(f.readline())
+                r3_filter_tot = float(f.readline())
+                r3_tot = float(f.readline())
+                r1_filter_tot = float(f.readline())
+                r1_tot = float(f.readline())
+                r_filter_rank = float(f.readline())
+                r_rank = float(f.readline())
+                r_filter_reci_rank = float(f.readline())
+                r_reci_rank = float(f.readline())
+                r_filter_tot_constrain = float(f.readline())
+                r_tot_constrain = float(f.readline())
+                r3_filter_tot_constrain = float(f.readline())
+                r3_tot_constrain = float(f.readline())
+                r1_filter_tot_constrain = float(f.readline())
+                r1_tot_constrain = float(f.readline())
+                r_filter_rank_constrain = float(f.readline())
+                r_rank_constrain = float(f.readline())
+                r_filter_reci_rank_constrain = float(f.readline())
+                r_reci_rank_constrain = float(f.readline())
+
+                if self.test_head != 0:
+                    l_filter_tot = float(f.readline())
+                    l_tot = float(f.readline())
+                    l3_filter_tot = float(f.readline())
+                    l3_tot = float(f.readline())
+                    l1_filter_tot = float(f.readline())
+                    l1_tot = float(f.readline())
+                    l_filter_rank = float(f.readline())
+                    l_rank = float(f.readline())
+                    l_filter_reci_rank = float(f.readline())
+                    l_reci_rank = float(f.readline())
+                    l_filter_tot_constrain = float(f.readline())
+                    l_tot_constrain = float(f.readline())
+                    l3_filter_tot_constrain = float(f.readline())
+                    l3_tot_constrain = float(f.readline())
+                    l1_filter_tot_constrain = float(f.readline())
+                    l1_tot_constrain = float(f.readline())
+                    l_filter_rank_constrain = float(f.readline())
+                    l_rank_constrain = float(f.readline())
+                    l_filter_reci_rank_constrain = float(f.readline())
+                    l_reci_rank_constrain = float(f.readline())
+
+        test_triples_done = 0
+        for i in range(lef, rig):
+            #tail
+            self.lib.getTailBatch(i, test_h_addr, test_t_addr, test_r_addr)
+            res = self.test_step(test_h, test_t, test_r)
+            test_tail_res = [j for j in self.lib.testTail(i, res.__array_interface__['data'][0]).contents]
+            r_s = test_tail_res[0]
+            r_filter_s = test_tail_res[1]
+            r_s_constrain = test_tail_res[2]
+            r_filter_s_constrain = test_tail_res[3]
+
+            if (r_filter_s < 10): r_filter_tot += 1
+            if (r_s < 10): r_tot += 1
+            if (r_filter_s < 3): r3_filter_tot += 1
+            if (r_s < 3): r3_tot += 1
+            if (r_filter_s < 1): r1_filter_tot += 1
+            if (r_s < 1): r1_tot += 1
+
+            r_filter_rank += (1+r_filter_s)
+            r_rank += (1+r_s)
+            r_filter_reci_rank += np.divide(1.0, (1+r_filter_s))
+            r_reci_rank += np.divide(1.0, (1+r_s))
+
+            #TYPE_C
+            if (r_filter_s_constrain < 10): r_filter_tot_constrain += 1
+            if (r_s_constrain < 10): r_tot_constrain += 1
+            if (r_filter_s_constrain < 3): r3_filter_tot_constrain += 1
+            if (r_s_constrain < 3): r3_tot_constrain += 1
+            if (r_filter_s_constrain < 1): r1_filter_tot_constrain += 1
+            if (r_s_constrain < 1): r1_tot_constrain += 1
+
+            r_filter_rank_constrain += (1+r_filter_s_constrain)
+            r_rank_constrain += (1+r_s_constrain)
+            r_filter_reci_rank_constrain += np.divide(1.0, (1+r_filter_s_constrain))
+            r_reci_rank_constrain += np.divide(1.0, (1+r_s_constrain))
+
+            #head
+            if self.test_head != 0:
+                #head
+                self.lib.getHeadBatch(i, test_h_addr, test_t_addr, test_r_addr)
+                res = self.test_step(test_h, test_t, test_r)
+                test_head_res = [j for j in self.lib.testHead(i, res.__array_interface__['data'][0]).contents]
+                l_s = test_head_res[0]
+                l_filter_s = test_head_res[1]
+                l_s_constrain = test_head_res[2]
+                l_filter_s_constrain = test_head_res[3]
+
+                if (l_filter_s < 10): l_filter_tot += 1
+                if (l_s < 10): l_tot += 1
+                if (l_filter_s < 3): l3_filter_tot += 1
+                if (l_s < 3): l3_tot += 1
+                if (l_filter_s < 1): l1_filter_tot += 1
+                if (l_s < 1): l1_tot += 1
+
+                l_filter_rank += (l_filter_s+1)
+                l_rank += (1+l_s)
+                l_filter_reci_rank += np.divide(1.0, (l_filter_s+1))
+                l_reci_rank += np.divide(1.0, (l_s+1))
+
+                #TYPE_C
+                if (l_filter_s_constrain < 10): l_filter_tot_constrain += 1
+                if (l_s_constrain < 10): l_tot_constrain += 1
+                if (l_filter_s_constrain < 3): l3_filter_tot_constrain += 1
+                if (l_s_constrain < 3): l3_tot_constrain += 1
+                if (l_filter_s_constrain < 1): l1_filter_tot_constrain += 1
+                if (l_s_constrain < 1): l1_tot_constrain += 1
+
+                l_filter_rank_constrain += (l_filter_s_constrain+1)
+                l_rank_constrain += (1+l_s_constrain)
+                l_filter_reci_rank_constrain += np.divide(1.0, (l_filter_s_constrain+1))
+                l_reci_rank_constrain += np.divide(1.0, (l_s_constrain+1))
+
+            if index == 0: sys.stdout.write("\r# of test triples processed: {}".format(i * self.N_THREADS_LP))
+
+            test_triples_done += 1
+
+
+            if test_triples_done % 100 == 0:
+                with open(self.test_log_path+"thread"+str(index), "w") as f:
+                    f.write(str(i)+'\n')
+
+                    f.write(str(r_filter_tot)+'\n')
+                    f.write(str(r_tot)+'\n')
+                    f.write(str(r3_filter_tot)+'\n')
+                    f.write(str(r3_tot)+'\n')
+                    f.write(str(r1_filter_tot)+'\n')
+                    f.write(str(r1_tot)+'\n')
+                    f.write(str(r_filter_rank)+'\n')
+                    f.write(str(r_rank)+'\n')
+                    f.write(str(r_filter_reci_rank)+'\n')
+                    f.write(str(r_reci_rank)+'\n')
+                    f.write(str(r_filter_tot_constrain)+'\n')
+                    f.write(str(r_tot_constrain)+'\n')
+                    f.write(str(r3_filter_tot_constrain)+'\n')
+                    f.write(str(r3_tot_constrain)+'\n')
+                    f.write(str(r1_filter_tot_constrain)+'\n')
+                    f.write(str(r1_tot_constrain)+'\n')
+                    f.write(str(r_filter_rank_constrain)+'\n')
+                    f.write(str(r_rank_constrain)+'\n')
+                    f.write(str(r_filter_reci_rank_constrain)+'\n')
+                    f.write(str(r_reci_rank_constrain)+'\n')
+
+                    if self.test_head != 0:
+                        f.write(str(l_filter_tot)+'\n')
+                        f.write(str(l_tot)+'\n')
+                        f.write(str(l3_filter_tot)+'\n')
+                        f.write(str(l3_tot)+'\n')
+                        f.write(str(l1_filter_tot)+'\n')
+                        f.write(str(l1_tot)+'\n')
+                        f.write(str(l_filter_rank)+'\n')
+                        f.write(str(l_rank)+'\n')
+                        f.write(str(l_filter_reci_rank)+'\n')
+                        f.write(str(l_reci_rank)+'\n')
+                        f.write(str(l_filter_tot_constrain)+'\n')
+                        f.write(str(l_tot_constrain)+'\n')
+                        f.write(str(l3_filter_tot_constrain)+'\n')
+                        f.write(str(l3_tot_constrain)+'\n')
+                        f.write(str(l1_filter_tot_constrain)+'\n')
+                        f.write(str(l1_tot_constrain)+'\n')
+                        f.write(str(l_filter_rank_constrain)+'\n')
+                        f.write(str(l_rank_constrain)+'\n')
+                        f.write(str(l_filter_reci_rank_constrain)+'\n')
+                        f.write(str(l_reci_rank_constrain)+'\n')
+
+
+        #tail
+        self.lp_res[index] = {'r_filter_tot':r_filter_tot,
+                              'r_tot':r_tot,
+                              'r3_filter_tot':r3_filter_tot,
+                              'r3_tot':r3_tot,
+                              'r1_filter_tot':r1_filter_tot,
+                              'r1_tot':r1_tot,
+
+                              'r_filter_rank':r_filter_rank,
+                              'r_rank':r_rank,
+                              'r_filter_reci_rank':r_filter_reci_rank,
+                              'r_reci_rank':r_reci_rank,
+
+                              'r_filter_tot_constrain':r_filter_tot_constrain,
+                              'r_tot_constrain':r_tot_constrain,
+                              'r3_filter_tot_constrain':r3_filter_tot_constrain,
+                              'r3_tot_constrain': r3_tot_constrain,
+                              'r1_filter_tot_constrain':r1_filter_tot_constrain,
+                              'r1_tot_constrain':r1_tot_constrain,
+
+                              'r_filter_rank_constrain':r_filter_rank_constrain,
+                              'r_rank_constrain':r_rank_constrain,
+                              'r_filter_reci_rank_constrain':r_filter_reci_rank_constrain,
+                              'r_reci_rank_constrain':r_reci_rank_constrain}
+
+        #head
+        if self.test_head != 0:
+            self.lp_res[index]['l_filter_tot'] = l_filter_tot
+            self.lp_res[index]['l_tot'] = l_tot
+            self.lp_res[index]['l3_filter_tot'] = l3_filter_tot
+            self.lp_res[index]['l3_tot'] = l3_tot
+            self.lp_res[index]['l1_filter_tot'] = l1_filter_tot
+            self.lp_res[index]['l1_tot'] = l1_tot
+
+            self.lp_res[index]['l_filter_rank'] = l_filter_rank
+            self.lp_res[index]['l_rank'] = l_rank
+            self.lp_res[index]['l_filter_reci_rank'] = l_filter_reci_rank
+            self.lp_res[index]['l_reci_rank'] = l_reci_rank
+
+            self.lp_res[index]['l_filter_tot_constrain'] = l_filter_tot_constrain
+            self.lp_res[index]['l_tot_constrain'] = l_tot_constrain
+            self.lp_res[index]['l3_filter_tot_constrain'] = l3_filter_tot_constrain
+            self.lp_res[index]['l3_tot_constrain'] = l3_tot_constrain
+            self.lp_res[index]['l1_filter_tot_constrain'] = l1_filter_tot_constrain
+            self.lp_res[index]['l1_tot_constrain'] = l1_tot_constrain
+
+            self.lp_res[index]['l_filter_rank_constrain'] = l_filter_rank_constrain
+            self.lp_res[index]['l_rank_constrain'] = l_rank_constrain
+            self.lp_res[index]['l_filter_reci_rank_constrain'] = l_filter_reci_rank_constrain
+            self.lp_res[index]['l_reci_rank_constrain'] = l_reci_rank_constrain
 
 
     def test(self):
@@ -495,22 +649,169 @@ class Config(object):
             with self.sess.as_default():
                 if self.importName != None:
                     self.restore_tensorflow()
+
+                test_time_start = time.time()
+
                 if self.test_link_prediction:
-                    total = self.lib.getTestTotal()
-                    for times in range(total):
-                        self.lib.getHeadBatch(self.test_h_addr, self.test_t_addr, self.test_r_addr)
-                        res = self.test_step(self.test_h, self.test_t, self.test_r)
-                        self.lib.testHead(res.__array_interface__['data'][0])
+                    l1_filter_tot = l1_tot = r1_tot = r1_filter_tot = l_tot = r_tot = l_filter_rank = l_rank = l_filter_reci_rank = l_reci_rank = 0.0
+                    l3_filter_tot = l3_tot = r3_tot = r3_filter_tot = l_filter_tot = r_filter_tot = r_filter_rank = r_rank = r_filter_reci_rank = r_reci_rank = 0.0
+                    #TYPE_C
+                    l1_filter_tot_constrain = l1_tot_constrain = r1_tot_constrain = r1_filter_tot_constrain = l_tot_constrain = r_tot_constrain = l_filter_rank_constrain = l_rank_constrain = l_filter_reci_rank_constrain = l_reci_rank_constrain = 0.0
+                    l3_filter_tot_constrain = l3_tot_constrain = r3_tot_constrain = r3_filter_tot_constrain = l_filter_tot_constrain = r_filter_tot_constrain = r_filter_rank_constrain = r_rank_constrain = r_filter_reci_rank_constrain = r_reci_rank_constrain = 0.0
 
-                        self.lib.getTailBatch(self.test_h_addr, self.test_t_addr, self.test_r_addr)
-                        res = self.test_step(self.test_h, self.test_t, self.test_r)
-                        self.lib.testTail(res.__array_interface__['data'][0])
-                        if self.log_on:
-                            #EDIT
-                            # print(times)
-                            sys.stdout.write("\r# of test triples processed: {}/{}".format(times, total))
 
-                    self.lib.test_link_prediction()
+                    testTotal = self.lib.getTestTotal()
+                    triples_per_thread = int(testTotal / self.N_THREADS_LP)
+                    print("Number of test triples: {} Number of triples per test thread: {}".format(testTotal, triples_per_thread))
+                    threads_array = []
+
+                    lef = 0
+                    rig = 0
+                    for j in range(self.N_THREADS_LP):
+                        if j+1 == self.N_THREADS_LP:
+                            rig = testTotal
+                        else:
+                            rig += triples_per_thread
+                        threads_array.append(threading.Thread(target=self.test_lp_range, args=(j, lef, rig, )))
+                        lef = rig
+
+
+                    for t in threads_array:
+                        t.start()
+
+                    idx = 0
+                    for t in threads_array:
+                        t.join()
+
+                    for res in self.lp_res:
+                        #tail
+                        r_filter_tot += res['r_filter_tot']
+                        r_tot += res['r_tot']
+                        r3_filter_tot += res['r3_filter_tot']
+                        r3_tot += res['r3_tot']
+                        r1_filter_tot += res['r1_filter_tot']
+                        r1_tot += res['r1_tot']
+                        r_filter_rank += res['r_filter_rank']
+                        r_rank += res['r_rank']
+                        r_filter_reci_rank += res['r_filter_reci_rank']
+                        r_reci_rank += res['r_reci_rank']
+
+                        #tail TYPE_C
+                        r_filter_tot_constrain += res['r_filter_tot_constrain']
+                        r_tot_constrain += res['r_tot_constrain']
+                        r3_filter_tot_constrain += res['r3_filter_tot_constrain']
+                        r3_tot_constrain += res['r3_tot_constrain']
+                        r1_filter_tot_constrain += res['r1_filter_tot_constrain']
+                        r1_tot_constrain += res['r1_tot_constrain']
+                        r_filter_rank_constrain += res['r_filter_rank_constrain']
+                        r_rank_constrain += res['r_rank_constrain']
+                        r_filter_reci_rank_constrain += res['r_filter_reci_rank_constrain']
+                        r_reci_rank_constrain += res['r_reci_rank_constrain']
+
+                        if self.test_head != 0:
+                            #head
+                            l_filter_tot += res['l_filter_tot']
+                            l_tot += res['l_tot']
+                            l3_filter_tot += res['l3_filter_tot']
+                            l3_tot += res['l3_tot']
+                            l1_filter_tot += res['l1_filter_tot']
+                            l1_tot += res['l1_tot']
+                            l_filter_rank += res['l_filter_rank']
+                            l_rank += res['l_rank']
+                            l_filter_reci_rank += res['l_filter_reci_rank']
+                            l_reci_rank += res['l_reci_rank']
+
+                            #head TYPE_C
+                            l_filter_tot_constrain += res['l_filter_tot_constrain']
+                            l_tot_constrain += res['l_tot_constrain']
+                            l3_filter_tot_constrain += res['l3_filter_tot_constrain']
+                            l3_tot_constrain += res['l3_tot_constrain']
+                            l1_filter_tot_constrain += res['l1_filter_tot_constrain']
+                            l1_tot_constrain += res['l1_tot_constrain']
+                            l_filter_rank_constrain += res['l_filter_rank_constrain']
+                            l_rank_constrain += res['l_rank_constrain']
+                            l_filter_reci_rank_constrain += res['l_filter_reci_rank_constrain']
+                            l_reci_rank_constrain += res['l_reci_rank_constrain']
+
+
+                    #tail
+                    r_rank = np.divide(r_rank, testTotal)
+                    r_reci_rank = np.divide(r_reci_rank, testTotal)
+                    r_tot = np.divide(r_tot, testTotal)
+                    r3_tot = np.divide(r3_tot, testTotal)
+                    r1_tot = np.divide(r1_tot, testTotal)
+                    r_filter_rank = np.divide(r_filter_rank, testTotal)
+                    r_filter_reci_rank = np.divide(r_filter_reci_rank, testTotal)
+                    r_filter_tot = np.divide(r_filter_tot, testTotal)
+                    r3_filter_tot = np.divide(r3_filter_tot, testTotal)
+                    r1_filter_tot = np.divide(r1_filter_tot, testTotal)
+
+                    #TYPE_C
+                    r_rank_constrain = np.divide(r_rank_constrain, testTotal)
+                    r_reci_rank_constrain = np.divide(r_reci_rank_constrain, testTotal)
+                    r_tot_constrain = np.divide(r_tot_constrain, testTotal)
+                    r3_tot_constrain = np.divide(r3_tot_constrain, testTotal)
+                    r1_tot_constrain = np.divide(r1_tot_constrain, testTotal)
+                    r_filter_rank_constrain = np.divide(r_filter_rank_constrain, testTotal)
+                    r_filter_reci_rank_constrain = np.divide(r_filter_reci_rank_constrain, testTotal)
+                    r_filter_tot_constrain = np.divide(r_filter_tot_constrain, testTotal)
+                    r3_filter_tot_constrain = np.divide(r3_filter_tot_constrain, testTotal)
+                    r1_filter_tot_constrain = np.divide(r1_filter_tot_constrain, testTotal)
+
+                    if self.test_head != 0:
+                        #head
+                        l_rank = np.divide(l_rank, testTotal)
+                        l_reci_rank = np.divide(l_reci_rank, testTotal)
+                        l_tot = np.divide(l_tot, testTotal)
+                        l3_tot = np.divide(l3_tot, testTotal)
+                        l1_tot = np.divide(l1_tot, testTotal)
+                        l_filter_rank = np.divide(l_filter_rank, testTotal)
+                        l_filter_reci_rank = np.divide(l_filter_reci_rank, testTotal)
+                        l_filter_tot = np.divide(l_filter_tot, testTotal)
+                        l3_filter_tot = np.divide(l3_filter_tot, testTotal)
+                        l1_filter_tot = np.divide(l1_filter_tot, testTotal)
+
+                        #TYPE_C
+                        l_rank_constrain = np.divide(l_rank_constrain, testTotal)
+                        l_reci_rank_constrain = np.divide(l_reci_rank_constrain, testTotal)
+                        l_tot_constrain = np.divide(l_tot_constrain, testTotal)
+                        l3_tot_constrain = np.divide(l3_tot_constrain, testTotal)
+                        l1_tot_constrain = np.divide(l1_tot_constrain, testTotal)
+                        l_filter_rank_constrain = np.divide(l_filter_rank_constrain, testTotal)
+                        l_filter_reci_rank_constrain = np.divide(l_filter_reci_rank_constrain, testTotal)
+                        l_filter_tot_constrain = np.divide(l_filter_tot_constrain, testTotal)
+                        l3_filter_tot_constrain = np.divide(l3_filter_tot_constrain, testTotal)
+                        l1_filter_tot_constrain = np.divide(l1_filter_tot_constrain, testTotal)
+
+
+                    print("\n ========== LINK PREDICTION RESULTS ==========\nNo type constraint results:")
+                    print("{:<20}{:<20}{:<20}{:<20}{:<20}{:<20}".format("metric", "MRR", "MR", "hit@10", "hit@3", "hit@1"))
+                    if self.test_head != 0: print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}".format("l(raw):",l_reci_rank, l_rank, l_tot, l3_tot, l1_tot))
+                    print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}".format("r(raw):", r_reci_rank, r_rank, r_tot, r3_tot, r1_tot))
+                    if self.test_head != 0: print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}\n".format("mean(raw):", np.divide((l_reci_rank+r_reci_rank),2), np.divide((l_rank+r_rank),2), np.divide((l_tot+r_tot),2), np.divide((l3_tot+r3_tot),2), np.divide((l1_tot+r1_tot),2)))
+
+                    if self.test_head != 0: print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}".format("l(filter):", l_filter_reci_rank, l_filter_rank, l_filter_tot, l3_filter_tot, l1_filter_tot))
+                    print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}".format('r(filter):', r_filter_reci_rank, r_filter_rank, r_filter_tot, r3_filter_tot, r1_filter_tot))
+                    if self.test_head != 0: print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}\n".format('mean(filter):', np.divide((l_filter_reci_rank+r_filter_reci_rank),2), np.divide((l_filter_rank+r_filter_rank),2), np.divide((l_filter_tot+r_filter_tot),2), np.divide((l3_filter_tot+r3_filter_tot),2), np.divide((l1_filter_tot+r1_filter_tot),2)))
+
+                    print("Type constraint results:")
+                    print("{:<20}{:<20}{:<20}{:<20}{:<20}{:<20}".format("metric", "MRR", "MR", "hit@10", "hit@3", "hit@1"))
+                    if self.test_head != 0: print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}".format('l(raw):', l_reci_rank_constrain, l_rank_constrain, l_tot_constrain, l3_tot_constrain, l1_tot_constrain))
+                    print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}".format('r(raw):', r_reci_rank_constrain, r_rank_constrain, r_tot_constrain, r3_tot_constrain, r1_tot_constrain))
+                    if self.test_head != 0: print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}\n".format('mean(raw):', np.divide((l_reci_rank_constrain+r_reci_rank_constrain),2), np.divide((l_rank_constrain+r_rank_constrain),2), np.divide((l_tot_constrain+r_tot_constrain),2), np.divide((l3_tot_constrain+r3_tot_constrain),2), np.divide((l1_tot_constrain+r1_tot_constrain),2)))
+
+                    if self.test_head != 0: print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}".format('l(filter):', l_filter_reci_rank_constrain, l_filter_rank_constrain, l_filter_tot_constrain, l3_filter_tot_constrain, l1_filter_tot_constrain))
+                    print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}".format('r(filter):', r_filter_reci_rank_constrain, r_filter_rank_constrain, r_filter_tot_constrain, r3_filter_tot_constrain, r1_filter_tot_constrain))
+                    if self.test_head != 0: print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}\n".format('mean(filter):', np.divide((l_filter_reci_rank_constrain+r_filter_reci_rank_constrain),2), np.divide((l_filter_rank_constrain+r_filter_rank_constrain),2), np.divide((l_filter_tot_constrain+r_filter_tot_constrain),2), np.divide((l3_filter_tot_constrain+r3_filter_tot_constrain),2), np.divide((l1_filter_tot_constrain+r1_filter_tot_constrain),2)))
+
+                    #remove test checkpoint
+                    for index in range(0, self.N_THREADS_LP):
+                        try:
+                            os.remove(self.test_log_path+"thread"+str(index))
+                        except:
+                            print("File " + self.test_log_path+"thread"+str(index) + " not founded")
+
+
                 if self.test_triple_classification:
                     self.lib.getValidBatch(self.valid_pos_h_addr, self.valid_pos_t_addr, self.valid_pos_r_addr, self.valid_neg_h_addr, self.valid_neg_t_addr, self.valid_neg_r_addr)
                     res_pos = self.test_step(self.valid_pos_h, self.valid_pos_t, self.valid_pos_r)
@@ -521,8 +822,15 @@ class Config(object):
 
                     res_pos = self.test_step(self.test_pos_h, self.test_pos_t, self.test_pos_r)
                     res_neg = self.test_step(self.test_neg_h, self.test_neg_t, self.test_neg_r)
-                    #EDIT
+
                     self.lib.test_triple_classification(self.relThresh_addr, res_pos.__array_interface__['data'][0], res_neg.__array_interface__['data'][0], self.acc_addr)
+
+                test_time_elapsed = time.time() - test_time_start
+                print("\nElapsed test time (seconds): {}".format(test_time_elapsed))
+
+
+
+
 
     #EDIT
     def valid(self):

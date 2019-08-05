@@ -48,10 +48,6 @@ INT getTrainTotal_();
 extern "C"
 INT getBatchTotal();
 
-//EDIT
-extern "C"
-void setConstrainFlag(INT con);
-
 extern "C"
 void randReset();
 
@@ -129,7 +125,6 @@ void* getBatch(void* con) {
 			last += batchSize;
 
 		}
-
 
 		for (INT times = 0; times < negRelRate; times++) {
 			batch_h[batch + last] = trainList_no[i].h;

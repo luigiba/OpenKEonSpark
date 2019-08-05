@@ -1,0 +1,46 @@
+#commands to run OpenKEonSpark on Google Colaboratory platform
+
+#install
+!sudo apt-get update 
+!sudo apt-get upgrade
+!sudo apt-get install w3m w3m-img
+!sudo apt-get install net-tools
+!apt-get install openjdk-8-jdk-headless -qq > /dev/null
+import os
+os.environ["JAVA_HOME"] = "/usr/lib/jvm/java-8-openjdk-amd64"
+!sudo apt-get install scala
+!wget -q https://archive.apache.org/dist/spark/spark-2.1.1/spark-2.1.1-bin-hadoop2.7.tgz 
+!tar xf spark-2.1.1-bin-hadoop2.7.tgz
+!python3 -m pip install tensorflowonspark py4j pyspark
+
+#connect Google Drive
+from google.colab import drive
+drive.mount('/content/drive')
+
+#unzip project
+!unzip /content/drive/My\ Drive/DBpedia/OpenKEonSpark.zip
+!mv OpenKEonSpark/gpu_info.py /usr/local/lib/python3.6/dist-packages/tensorflowonspark/gpu_info.py
+
+#unzip dataset
+!unzip /content/drive/My\ Drive/DBpedia/5.zip -d /content/drive/My\ Drive/DBpedia/
+!unzip /content/drive/My\ Drive/DBpedia/10.zip -d /content/drive/My\ Drive/DBpedia/
+!unzip /content/drive/My\ Drive/DBpedia/15.zip -d /content/drive/My\ Drive/DBpedia/
+
+#set env vars
+import os
+os.environ["JAVA_HOME"] = "/usr/lib/jvm/java-8-openjdk-amd64"
+os.environ['SPARK_WORKER_INSTANCES'] = '3'
+os.environ['PYSPARK_PYTHON'] = '/usr/bin/python3'
+os.environ["CUDA_VISIBLE_DEVICES"]="0"
+os.environ["CORES_PER_WORKER"] = "1"
+os.environ["MEMORY_PER_WORKER"] = "4g"
+os.environ["LIB_CUDA"] = "/usr/local/cuda-10.0/lib64"
+os.environ["WORK_DIR_PREFIX"] = "/content/OpenKEonSpark"
+os.environ["SPARK_HOME"] = "/content/spark-2.1.1-bin-hadoop2.7"
+
+#execute
+!bash $WORK_DIR_PREFIX/run_dbpedia_5.sh
+
+
+
+

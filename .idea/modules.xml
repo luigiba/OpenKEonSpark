@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/OpenKE_new_Spark.iml" filepath="$PROJECT_DIR$/OpenKE_new_Spark.iml" />
+      <module fileurl="file://$PROJECT_DIR$/OpenKEonSpark.iml" filepath="$PROJECT_DIR$/OpenKEonSpark.iml" />
     </modules>
   </component>
 </project>

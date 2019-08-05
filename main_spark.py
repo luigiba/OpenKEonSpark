@@ -8,10 +8,9 @@ import sys
 import os
 import traceback
 import time
-import shutil
 from os import path
 
-os.environ["CUDA_VISIBLE_DEVICES"]="-1"
+# os.environ["CUDA_VISIBLE_DEVICES"]="-1"
 
 DEBUG = distribute_training.DEBUG
 
@@ -40,7 +39,7 @@ def update_entities_and_model():
         n_new_entities = int(f.readline().strip())
         if n_new_entities > 0:
             for _ in range(n_new_entities):
-                batch_entities.append((f.readline()))
+                batch_entities.append(f.readline())
 
 
     ######### READ OLD ENTITIES #########
@@ -52,48 +51,49 @@ def update_entities_and_model():
 
 
     ######### UPDATE THE MODEL #########
-    con, ckpt = distribute_training.get_conf_to_update_model(sys.argv.output_path)
-    vars = []
+    if n_new_entities > 0:
+        con, ckpt = distribute_training.get_conf_to_update_model(sys.argv.output_path)
+        vars = []
 
-    if DEBUG: print("\nGLOBAL VARS FOUNDED IN CHECKPOINT:\n")
-    with con.graph.as_default():
-        with con.sess.as_default():
-            for v in tf.global_variables():
-                if DEBUG: print(str(v.name) + " " + str(v.shape))
-                vars.append(v)
-    if DEBUG: print('\n')
+        if DEBUG: print("\nGLOBAL VARS FOUNDED IN CHECKPOINT:\n")
+        with con.graph.as_default():
+            with con.sess.as_default():
+                for v in tf.global_variables():
+                    if DEBUG: print(str(v.name) + " " + str(v.shape))
+                    vars.append(v)
+        if DEBUG: print('\n')
 
 
-    if DEBUG: print("NEW GLOBAL VARIABLES")
-    graph = tf.Graph()
-    with graph.as_default():
-        sess = tf.Session()
-        with sess.as_default():
-            for v in vars:
-                current_name = v.name.split(':')[0]
+        if DEBUG: print("NEW GLOBAL VARIABLES")
+        graph = tf.Graph()
+        with graph.as_default():
+            sess = tf.Session()
+            with sess.as_default():
+                for v in vars:
+                    current_name = v.name.split(':')[0]
 
-                if (current_name == ENTITY_EMBEDDING_TENSOR_NAME) and (final_entity_size > n_entities):
-                    tmp = tf.get_variable(name=current_name, shape=[final_entity_size, v.shape[1]], initializer=tf.contrib.layers.xavier_initializer(uniform = False), dtype=v.dtype)
-                    sess.run(tf.initialize_variables([tmp]))
-                    tmp_value = con.sess.run(v)
-                    sess.run(tf.scatter_update(tmp, [i for i in range(0, n_entities)], tmp_value))
+                    if current_name == ENTITY_EMBEDDING_TENSOR_NAME:
+                        tmp = tf.get_variable(name=current_name, shape=[final_entity_size, v.shape[1]], initializer=tf.contrib.layers.xavier_initializer(uniform = False), dtype=v.dtype)
+                        sess.run(tf.initialize_variables([tmp]))
+                        tmp_value = con.sess.run(v)
+                        sess.run(tf.scatter_update(tmp, [i for i in range(0, n_entities)], tmp_value))
 
-                elif (current_name in [ENTITY_EMBEDDING_TENSOR_NAME+'/Adam', ENTITY_EMBEDDING_TENSOR_NAME+'/Adam_1']) and (final_entity_size > n_entities):
-                    tmp = tf.get_variable(name=current_name, shape=[final_entity_size, v.shape[1]], initializer=tf.zeros_initializer(), dtype=v.dtype)
-                    sess.run(tf.initialize_variables([tmp]))
-                    tmp_value = con.sess.run(v)
-                    sess.run(tf.scatter_update(tmp, [i for i in range(0, n_entities)], tmp_value))
+                    elif current_name in [ENTITY_EMBEDDING_TENSOR_NAME+'/Adam', ENTITY_EMBEDDING_TENSOR_NAME+'/Adam_1']:
+                        tmp = tf.get_variable(name=current_name, shape=[final_entity_size, v.shape[1]], initializer=tf.zeros_initializer(), dtype=v.dtype)
+                        sess.run(tf.initialize_variables([tmp]))
+                        tmp_value = con.sess.run(v)
+                        sess.run(tf.scatter_update(tmp, [i for i in range(0, n_entities)], tmp_value))
 
-                else:
-                    tmp = tf.get_variable(name=current_name, shape=v.shape, dtype=v.dtype)
-                    tmp_value = con.sess.run(v)
-                    sess.run(tf.assign(tmp, tmp_value))
+                    else:
+                        tmp = tf.get_variable(name=current_name, shape=v.shape, dtype=v.dtype)
+                        tmp_value = con.sess.run(v)
+                        sess.run(tf.assign(tmp, tmp_value))
 
-            for v in tf.global_variables():
-                print(str(v.name) + " " + str(v.shape))
+                for v in tf.global_variables():
+                    print(str(v.name) + " " + str(v.shape))
 
-            saver = tf.train.Saver()
-            saver.save(sess, ckpt, write_state=False)
+                saver = tf.train.Saver()
+                saver.save(sess, ckpt, write_state=False)
 
 
     ######### UPDATE ENTITY FILE #########
@@ -272,9 +272,9 @@ if __name__ == '__main__':
     parser.add_argument("--cluster_size", help="number of nodes in the cluster", type=int, default=int(sc._conf.get("spark.executor.instances")))
     parser.add_argument("--num_ps", help="number of ps nodes", type=int, default=1)
     parser.add_argument("--num_gpus", help="number of gpus to use", type=int, default=0)
-    parser.add_argument("--input_path", help="dataset absolute path", type=str, default="/home/")
-    parser.add_argument("--output_path", help="model output absolute path", type=str, default="/home/")
-    # parser.add_argument("--working_threads", help="no. threads used during sampling", type=int, default=8)
+    parser.add_argument("--cpp_lib_path", help="cpp lib.so absolute path", type=str, default=None)
+    parser.add_argument("--input_path", help="dataset absolute path", type=str, default="drive/My\ Drive/DBpedia/5/0/")
+    parser.add_argument("--output_path", help="model output absolute path", type=str, default="OpenKE_new_Spark/res_spark")
     parser.add_argument("--train_times", help="no. epochs", type=int, default=1000)
     parser.add_argument("--n_batches", help="no. batches", type=int, default=0)
     parser.add_argument("--alpha", help="learning rate", type=float, default=0.001)
