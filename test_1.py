@@ -14,19 +14,21 @@ def get_ckpt(p):
 
 
 #/home/luigi/IdeaProjects/OpenKE_new_Spark/benchmarks/DBpedia
-dataset_path = '/home/luigi/files/stuff/superuser/9/1/'
+dataset_path = '/home/luigi/files/stuff/superuser/9/8/'
 path = dataset_path + 'model/'
 ckpt = get_ckpt(path)
 
 
 con = Config()
 con.set_in_path(dataset_path)
-con.set_test_link_prediction(True)
+# con.set_test_link_prediction(True)
 # con.set_test_triple_classification(True)
 con.set_dimension(int(100))
 con.init()
 con.set_model_and_session(TransE)
 con.set_import_files(path+ckpt)
 con.set_test_log_path(path)
-con.test()
+# con.test()
+con.predict_head_entity(0,0,1)
+# print(con.acc)
 

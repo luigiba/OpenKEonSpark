@@ -1,3 +1,6 @@
+echo "====================================== Clearning res_spark directory ======================================"
+rm /home/luigi/IdeaProjects/OpenKE_new_Spark/res_spark/*
+
 echo "====================================== Stopping Spark Master & slaves ======================================"
 $SPARK_HOME/sbin/stop-slave.sh
 $SPARK_HOME/sbin/stop-master.sh
@@ -11,9 +14,27 @@ m=$((n-1))
 for i in `seq 0 $m`
 do
   if [ -f /content/drive/My\ Drive/DBpedia/$n/$i/res.txt ]; then
-    echo "Skipping batch $i"
+    echo "Batch $i already done; Skipping batch $i"
 	  continue
   fi
+
+  if [ $i != 0 ]; then
+    k=$((i-1))
+    cd $WORK_DIR_PREFIX/res_spark
+    if [ "$(ls -1A | wc -l)" -eq 0 ] ; then
+      echo "Copying model into res_spark dir"
+      cp /content/drive/My\ Drive/DBpedia/$n/$k/model/* $WORK_DIR_PREFIX/res_spark/
+    fi
+
+    cd /content/drive/My\ Drive/DBpedia/$n/$i
+    if [ "$(ls -1A | wc -l)" -le 9 ] ; then
+      echo "Copying data into new batch dir"
+		  cp /content/drive/My\ Drive/DBpedia/$n/$k/entity2id.txt /content/drive/My\ Drive/DBpedia/$n/$k/relation2id.txt /content/drive/My\ Drive/DBpedia/$n/$k/test2id.txt /content/drive/My\ Drive/DBpedia/$n/$k/valid2id.txt /content/drive/My\ Drive/DBpedia/$n/$k/train2id.txt /content/drive/My\ Drive/DBpedia/$n/$i/
+    fi
+
+    cd /content
+  fi
+
 
 	echo "====================================== Starting Training for batch $i ======================================"
 	$SPARK_HOME/bin/spark-submit --master spark://$(hostname):7077 \
@@ -25,15 +46,15 @@ do
 	$WORK_DIR_PREFIX/main_spark.py \
     --cluster_size $SPARK_WORKER_INSTANCES --num_ps 1 --num_gpus 1 --cpp_lib_path $WORK_DIR_PREFIX/release/Base.so \
 	--input_path /content/drive/My\ Drive/DBpedia/$n/$i/ \
-    --output_path /content/drive/My\ Drive/DBpedia/$n/$i/model \
+    --output_path $WORK_DIR_PREFIX/res_spark \
     --alpha 0.0001 --optimizer SGD --train_times 50 --ent_neg_rate 1 --embedding_dimension 64 --margin 1.0 --model TransE
 
 
-	echo "====================================== Copying data into new batch folder for batch $i ======================================"
+	echo "====================================== Copying data for batch $i ======================================"
+	cp $WORK_DIR_PREFIX/res_spark/* /content/drive/My\ Drive/DBpedia/$n/$i/model/
 	j=$((i+1))
 	if [ $j != $n ]; then
-		cp /content/drive/My\ Drive/DBpedia/$n/$i/*.txt /content/drive/My\ Drive/DBpedia/$n/$j/
-		cp /content/drive/My\ Drive/DBpedia/$n/$i/model/* /content/drive/My\ Drive/DBpedia/$n/$j/model/
+		cp /content/drive/My\ Drive/DBpedia/$n/$i/entity2id.txt /content/drive/My\ Drive/DBpedia/$n/$i/relation2id.txt /content/drive/My\ Drive/DBpedia/$n/$i/test2id.txt /content/drive/My\ Drive/DBpedia/$n/$i/valid2id.txt /content/drive/My\ Drive/DBpedia/$n/$i/train2id.txt /content/drive/My\ Drive/DBpedia/$n/$j/
 	fi
 
 	echo "====================================== Test for batch $i ======================================"

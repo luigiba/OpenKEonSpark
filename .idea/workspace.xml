@@ -2,19 +2,14 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="0f79fb12-bf2b-474d-8da4-e622edb018dd" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Config.py" beforeDir="false" afterPath="$PROJECT_DIR$/Config.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/OpenKE_new_Spark.iml" beforeDir="false" afterPath="$PROJECT_DIR$/OpenKEonSpark.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/base/Base.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/base/Base.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/base/Setting.h" beforeDir="false" afterPath="$PROJECT_DIR$/base/Setting.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/base/Test.h" beforeDir="false" afterPath="$PROJECT_DIR$/base/Test.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/distribute_training.py" beforeDir="false" afterPath="$PROJECT_DIR$/distribute_training.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/main_spark.py" beforeDir="false" afterPath="$PROJECT_DIR$/main_spark.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/release/Base.so" beforeDir="false" afterPath="$PROJECT_DIR$/release/Base.so" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/run.sh" beforeDir="false" afterPath="$PROJECT_DIR$/run.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/run_dbpedia_10.sh" beforeDir="false" afterPath="$PROJECT_DIR$/run_dbpedia_10.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/run_dbpedia_15.sh" beforeDir="false" afterPath="$PROJECT_DIR$/run_dbpedia_15.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/run_dbpedia_5.sh" beforeDir="false" afterPath="$PROJECT_DIR$/run_dbpedia_5.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/test_1.py" beforeDir="false" afterPath="$PROJECT_DIR$/test_1.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -28,12 +23,6 @@
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
-  </component>
-  <component name="ProjectFrameBounds" extendedState="6">
-    <option name="x" value="293" />
-    <option name="y" value="53" />
-    <option name="width" value="1400" />
-    <option name="height" value="1000" />
   </component>
   <component name="ProjectId" id="1On7TJBKj3ZnByQP1GDdyVRo18W" />
   <component name="PropertiesComponent">

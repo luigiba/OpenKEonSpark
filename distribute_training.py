@@ -207,6 +207,7 @@ def main_fun(argv, ctx):
         local = 0
 
         while not sess.should_stop():
+            #gives time to other workers to connect
             if task_index == 0 and local == 0:
                 time.sleep(60)
             local += 1
