@@ -1,10 +1,21 @@
 from Config import Config
 from TransE import TransE
+from TransH import TransH
+from TransR import TransR
+from TransD import TransD
 import sys
+
+for arg in sys.argv:
+    print(arg)
+    print(type(arg))
+    print("\n")
 
 n = sys.argv[1]
 max = sys.argv[2]
 dim = sys.argv[3]
+model = sys.argv[4]
+
+
 
 def get_ckpt(p):
     ckpt = None
@@ -24,7 +35,16 @@ con.set_test_link_prediction(True)
 con.set_test_triple_classification(True)
 con.set_dimension(int(dim))
 con.init()
-con.set_model_and_session(TransE)
+
+if model.lower() == "transe":
+    con.set_model_and_session(TransE)
+elif model.lower() == "transh":
+    con.set_model_and_session(TransH)
+elif model.lower() == "transr":
+    con.set_model_and_session(TransR)
+else:
+    con.set_model_and_session(TransD)
+
 con.set_import_files(path+ckpt)
 con.set_test_log_path(path)
 con.test()

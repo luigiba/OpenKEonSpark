@@ -10,7 +10,6 @@ import traceback
 import time
 from os import path
 
-# os.environ["CUDA_VISIBLE_DEVICES"]="-1"
 
 DEBUG = distribute_training.DEBUG
 
@@ -366,5 +365,5 @@ if __name__ == '__main__':
                     os.remove(args.output_path+"/"+f)
 
 
-    if DEBUG: print("Program finished")
+    if DEBUG: print("Training finished")
 

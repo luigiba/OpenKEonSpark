@@ -3,8 +3,6 @@
 #install
 !sudo apt-get update 
 !sudo apt-get upgrade
-!sudo apt-get install w3m w3m-img
-!sudo apt-get install net-tools
 !apt-get install openjdk-8-jdk-headless -qq > /dev/null
 import os
 os.environ["JAVA_HOME"] = "/usr/lib/jvm/java-8-openjdk-amd64"
@@ -39,7 +37,10 @@ os.environ["WORK_DIR_PREFIX"] = "/content/OpenKEonSpark"
 os.environ["SPARK_HOME"] = "/content/spark-2.1.1-bin-hadoop2.7"
 
 #execute
-!bash $WORK_DIR_PREFIX/run_dbpedia_5.sh
+!bash $WORK_DIR_PREFIX/run_dbpedia.sh 5 64 "TransE"
+!bash $WORK_DIR_PREFIX/run_dbpedia.sh 10 64 "TransE"
+!bash $WORK_DIR_PREFIX/run_dbpedia.sh 15 64 "TransE"
+
 
 
 

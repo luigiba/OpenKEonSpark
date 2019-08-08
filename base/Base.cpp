@@ -54,6 +54,10 @@ void randReset();
 extern "C"
 void importTrainFiles();
 
+//EDIT
+extern "C"
+void importOntologyFiles();
+
 struct Parameter {
 	INT id;
 	INT *batch_h;

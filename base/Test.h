@@ -25,6 +25,8 @@ void getTailBatch(INT index, INT *ph, INT *pt, INT *pr) {
     }
 }
 
+
+
 extern "C"
 INT* testHead(INT index, REAL *con) {
     INT h = testList[index].h;
@@ -84,25 +86,49 @@ INT* testTail(INT index, REAL *con) {
     INT r = testList[index].r;
     REAL minimal = con[t];
 
-    INT* r_arr = new INT[4];
+    INT* r_arr = new INT[8];
+
     INT r_s = 0;
     INT r_filter_s = 0;
     INT r_s_constrain = 0;
     INT r_filter_s_constrain = 0;
 
-    INT lef = 0;
-    INT rig = 0;
-    lef = tail_lef[r];
-    rig = tail_rig[r];
+    INT r_min = t;
+    INT r_filter_min = t;
+    INT r_constrain_min = t;
+    INT r_filter_constrain_min = t;
 
+    REAL r_min_s = minimal;
+    REAL r_filter_min_s = minimal;
+    REAL r_constrain_min_s = minimal;
+    REAL r_filter_constrain_min_s = minimal;
+
+
+    INT lef = tail_lef[r];
+    INT rig = tail_rig[r];
     for (INT j = 0; j < entityTotal; j++) {
         if (j != t) {
 
             REAL value = con[j];
             if (value < minimal) {
                 r_s += 1;
-                if (not _find(h, j, r))
+
+
+                if (value < r_min_s){
+                    r_min_s = value;
+                    r_min = j;
+                }
+
+
+                if (not _find(h, j, r)){
                     r_filter_s += 1;
+
+                    if (value < r_filter_min_s){
+                        r_filter_min_s = value;
+                        r_filter_min = j;
+                    }
+                }
+
             }
 
             //TYPE_C
@@ -110,8 +136,20 @@ INT* testTail(INT index, REAL *con) {
             if (lef < rig && j == tail_type[lef]) {
                     if (value < minimal) {
                         r_s_constrain += 1;
+
+                        if (value < r_constrain_min_s){
+                            r_constrain_min_s = value;
+                            r_constrain_min = j;
+                        }
+
+
                         if (not _find(h, j ,r)) {
                             r_filter_s_constrain += 1;
+
+                            if (value < r_filter_constrain_min_s){
+                                r_filter_constrain_min_s = value;
+                                r_filter_constrain_min = j;
+                            }
                         }
                     }
             }
@@ -124,6 +162,36 @@ INT* testTail(INT index, REAL *con) {
     r_arr[1] = r_filter_s;
     r_arr[2] = r_s_constrain;
     r_arr[3] = r_filter_s_constrain;
+
+    r_arr[4] = r_min;
+    r_arr[5] = r_filter_min;
+    r_arr[6] = r_constrain_min;
+    r_arr[7] = r_filter_constrain_min;
+
+    INT lef_sup = sup_lef[t];
+    INT rig_sup = sup_rig[t];
+    INT lef_sub = sub_lef[t];
+    INT rig_sub = sub_rig[t];
+    for(INT i = 4; i < 8; i++){
+        if (r_arr[i] == t){                                                         //it's ok
+            r_arr[i] = 0;
+            continue;
+        }
+
+        while (lef_sup < rig_sup && sup_type[lef_sup] < r_arr[i]) lef_sup ++;       //generalization error
+        if (lef_sup < rig_sup && r_arr[i] == sup_type[lef_sup]){
+            r_arr[i] = 1;
+            continue;
+        }
+
+        while (lef_sub < rig_sub && sub_type[lef_sub] < r_arr[i]) lef_sub ++;       //specialization error
+        if (lef_sub < rig_sub && r_arr[i] == sub_type[lef_sub]){
+            r_arr[i] = 2;
+            continue;
+        }
+
+        r_arr[i] = 3;                                                               //misclassification error
+    }
 
     return r_arr;
 }
@@ -150,7 +218,7 @@ void getNegValid() {
     for (INT i = 0; i < validTotal; i++) {
         negValidList[i] = validList[i];
         negValidList[i].t = corrupt(validList[i].h, validList[i].r);
-    }   
+    }
 }
 
 extern "C"

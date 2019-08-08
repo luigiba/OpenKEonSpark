@@ -17,6 +17,7 @@ class Config(object):
         self.init_new_entities = init_new_entities
 
         if init_new_entities == False:
+            #set c++ lib
             if cpp_lib_path == None:
                 cpp_lib_path = '/home/luigi/IdeaProjects/OpenKEonSpark/release/Base.so'
             base_file = os.path.abspath(cpp_lib_path)
@@ -26,7 +27,7 @@ class Config(object):
             #link prediction
             self.lib.getTailBatch.argtypes = [ctypes.c_int64, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
             self.lib.testTail.argtypes = [ctypes.c_int64, ctypes.c_void_p]
-            self.lib.testTail.restype = ctypes.POINTER(ctypes.c_int64 * 4)
+            self.lib.testTail.restype = ctypes.POINTER(ctypes.c_int64 * 8)
             self.lib.getHeadBatch.argtypes = [ctypes.c_int64, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
             self.lib.testHead.argtypes = [ctypes.c_int64, ctypes.c_void_p]
             self.lib.testHead.restype = ctypes.POINTER(ctypes.c_int64 * 4)
@@ -38,6 +39,7 @@ class Config(object):
             self.lib.getBestThreshold.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
             self.lib.test_triple_classification.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
 
+            #set other parameters
             self.in_path = None
             self.test_log_path = None
             self.out_path = None
@@ -69,9 +71,11 @@ class Config(object):
         '''
         self.lib.importTestFiles()
         self.lib.importTypeFiles()
+        self.lib.importOntologyFiles()
         self.N_THREADS_LP = 10
         self.lp_res = []
         for _ in range(self.N_THREADS_LP): self.lp_res.append({})
+
 
     def init_triple_classification(self):
         r'''
@@ -154,25 +158,7 @@ class Config(object):
                 self.testTotal = self.lib.getTestTotal()
                 self.validTotal = self.lib.getValidTotal()
                 self.bt = self.lib.getBatchTotal()
-
-                tot = None
-
-                if self.bt > 0:
-                    tot = self.bt
-                else:
-                    tot = self.trainTotal
-
-                if self.nbatches > 0:
-                    self.batch_size = int(tot / self.nbatches)
-                else:
-                    self.batch_size = tot
-                    while self.batch_size > 9999:
-                        self.batch_size = int(self.batch_size / 10)
-                    self.nbatches = int(tot / self.batch_size)
-
-                print("Batch size is {}".format(self.batch_size))
-                print("Number of batches: {}".format(self.nbatches))
-
+                self.set_mini_batch()
                 self.batch_seq_size = self.batch_size * (1 + self.negative_ent + self.negative_rel)
                 self.batch_h = np.zeros(self.batch_size * (1 + self.negative_ent + self.negative_rel), dtype = np.int64)
                 self.batch_t = np.zeros(self.batch_size * (1 + self.negative_ent + self.negative_rel), dtype = np.int64)
@@ -182,14 +168,32 @@ class Config(object):
                 self.batch_t_addr = self.batch_t.__array_interface__['data'][0]
                 self.batch_r_addr = self.batch_r.__array_interface__['data'][0]
                 self.batch_y_addr = self.batch_y.__array_interface__['data'][0]
-
-
             if self.test_link_prediction:
                 self.init_link_prediction()
             if self.test_triple_classification:
                 self.init_triple_classification()
             if self.valid_triple_classification:
                 self.init_valid_triple_classification()
+
+    def set_mini_batch(self):
+        tot = None
+
+        if self.bt > 0:
+            tot = self.bt
+        else:
+            tot = self.trainTotal
+
+        if self.nbatches > 0:
+            self.batch_size = int(tot / self.nbatches)
+        else:
+            self.batch_size = tot
+            while self.batch_size > 9999:
+                self.batch_size = int(self.batch_size / 10)
+            self.nbatches = int(tot / self.batch_size)
+
+        print("Batch size is {}".format(self.batch_size))
+        print("Number of batches: {}".format(self.nbatches))
+
 
     def set_test_log_path(self, p):
         self.test_log_path = p
@@ -400,13 +404,40 @@ class Config(object):
 
 
     def test_lp_range(self, index, lef, rig):
-        l1_filter_tot = l1_tot = r1_tot = r1_filter_tot = l_tot = r_tot = l_filter_rank = l_rank = l_filter_reci_rank = l_reci_rank = 0.0
-        l3_filter_tot = l3_tot = r3_tot = r3_filter_tot = l_filter_tot = r_filter_tot = r_filter_rank = r_rank = r_filter_reci_rank = r_reci_rank = 0.0
+        current_lp_res = {
+            'r_tot' : 0.0, 'r_filter_tot' : 0.0, 'r_tot_constrain' : 0.0, 'r_filter_tot_constrain' : 0.0,
+            'r1_tot' : 0.0, 'r1_filter_tot' : 0.0, 'r1_tot_constrain' : 0.0, 'r1_filter_tot_constrain' : 0.0,
+            'r3_tot' : 0.0, 'r3_filter_tot' : 0.0,  'r3_tot_constrain' : 0.0, 'r3_filter_tot_constrain' : 0.0,
+            'r_rank' : 0.0, 'r_filter_rank' : 0.0, 'r_rank_constrain' : 0.0, 'r_filter_rank_constrain' : 0.0,
+            'r_reci_rank' : 0.0,'r_filter_reci_rank' : 0.0, 'r_reci_rank_constrain' : 0.0, 'r_filter_reci_rank_constrain' : 0.0,
 
-        #TYPE_C
-        l1_filter_tot_constrain = l1_tot_constrain = r1_tot_constrain = r1_filter_tot_constrain = l_tot_constrain = r_tot_constrain = l_filter_rank_constrain = l_rank_constrain = l_filter_reci_rank_constrain = l_reci_rank_constrain = 0.0
-        l3_filter_tot_constrain = l3_tot_constrain = r3_tot_constrain = r3_filter_tot_constrain = l_filter_tot_constrain = r_filter_tot_constrain = r_filter_rank_constrain = r_rank_constrain = r_filter_reci_rank_constrain = r_reci_rank_constrain = 0.0
+            'r_mis_err' : 0.0, 'r_spec_err' : 0.0, 'r_gen_err' : 0.0,
+            'r_filter_mis_err' : 0.0, 'r_filter_spec_err' : 0.0, 'r_filter_gen_err' : 0.0,
+            'r_mis_err_constrain' : 0.0, 'r_spec_err_constrain' : 0.0, 'r_gen_err_constrain' : 0.0,
+            'r_filter_mis_err_constrain' : 0.0, 'r_filter_spec_err_constrain' : 0.0, 'r_filter_gen_err_constrain' : 0.0
+        }
 
+        if self.test_head != 0:
+            current_lp_res['l_tot'] = 0.0
+            current_lp_res['l_filter_tot'] = 0.0
+            current_lp_res['l_tot_constrain'] = 0.0
+            current_lp_res['l_filter_tot_constrain'] = 0.0
+            current_lp_res['l1_tot'] = 0.0
+            current_lp_res['l1_filter_tot'] = 0.0
+            current_lp_res['l1_tot_constrain'] = 0.0
+            current_lp_res['l1_filter_tot_constrain'] = 0.0
+            current_lp_res['l3_tot'] = 0.0
+            current_lp_res['l3_filter_tot'] = 0.0
+            current_lp_res['l3_tot_constrain'] = 0.0
+            current_lp_res['l3_filter_tot_constrain'] = 0.0
+            current_lp_res['l_rank'] = 0.0
+            current_lp_res['l_filter_rank'] = 0.0
+            current_lp_res['l_rank_constrain'] = 0.0
+            current_lp_res['l_filter_rank_constrain'] = 0.0
+            current_lp_res['l_reci_rank'] = 0.0
+            current_lp_res['l_filter_reci_rank'] = 0.0
+            current_lp_res['l_reci_rank_constrain'] = 0.0
+            current_lp_res['l_filter_reci_rank_constrain'] = 0.0
 
         test_h = np.zeros(self.lib.getEntityTotal(), dtype = np.int64)
         test_t = np.zeros(self.lib.getEntityTotal(), dtype = np.int64)
@@ -423,49 +454,8 @@ class Config(object):
                 print("Restoring test results from index {}".format(last_i))
 
                 lef = last_i + 1
-
-                r_filter_tot = float(f.readline())
-                r_tot = float(f.readline())
-                r3_filter_tot = float(f.readline())
-                r3_tot = float(f.readline())
-                r1_filter_tot = float(f.readline())
-                r1_tot = float(f.readline())
-                r_filter_rank = float(f.readline())
-                r_rank = float(f.readline())
-                r_filter_reci_rank = float(f.readline())
-                r_reci_rank = float(f.readline())
-                r_filter_tot_constrain = float(f.readline())
-                r_tot_constrain = float(f.readline())
-                r3_filter_tot_constrain = float(f.readline())
-                r3_tot_constrain = float(f.readline())
-                r1_filter_tot_constrain = float(f.readline())
-                r1_tot_constrain = float(f.readline())
-                r_filter_rank_constrain = float(f.readline())
-                r_rank_constrain = float(f.readline())
-                r_filter_reci_rank_constrain = float(f.readline())
-                r_reci_rank_constrain = float(f.readline())
-
-                if self.test_head != 0:
-                    l_filter_tot = float(f.readline())
-                    l_tot = float(f.readline())
-                    l3_filter_tot = float(f.readline())
-                    l3_tot = float(f.readline())
-                    l1_filter_tot = float(f.readline())
-                    l1_tot = float(f.readline())
-                    l_filter_rank = float(f.readline())
-                    l_rank = float(f.readline())
-                    l_filter_reci_rank = float(f.readline())
-                    l_reci_rank = float(f.readline())
-                    l_filter_tot_constrain = float(f.readline())
-                    l_tot_constrain = float(f.readline())
-                    l3_filter_tot_constrain = float(f.readline())
-                    l3_tot_constrain = float(f.readline())
-                    l1_filter_tot_constrain = float(f.readline())
-                    l1_tot_constrain = float(f.readline())
-                    l_filter_rank_constrain = float(f.readline())
-                    l_rank_constrain = float(f.readline())
-                    l_filter_reci_rank_constrain = float(f.readline())
-                    l_reci_rank_constrain = float(f.readline())
+                for key in current_lp_res.keys():
+                    current_lp_res[key] = float(f.readline())
 
         test_triples_done = 0
         for i in range(lef, rig):
@@ -473,35 +463,75 @@ class Config(object):
             self.lib.getTailBatch(i, test_h_addr, test_t_addr, test_r_addr)
             res = self.test_step(test_h, test_t, test_r)
             test_tail_res = [j for j in self.lib.testTail(i, res.__array_interface__['data'][0]).contents]
+
             r_s = test_tail_res[0]
             r_filter_s = test_tail_res[1]
             r_s_constrain = test_tail_res[2]
             r_filter_s_constrain = test_tail_res[3]
 
-            if (r_filter_s < 10): r_filter_tot += 1
-            if (r_s < 10): r_tot += 1
-            if (r_filter_s < 3): r3_filter_tot += 1
-            if (r_s < 3): r3_tot += 1
-            if (r_filter_s < 1): r1_filter_tot += 1
-            if (r_s < 1): r1_tot += 1
+            r_min = test_tail_res[4]
+            r_filter_min = test_tail_res[5]
+            r_constrain_min = test_tail_res[6]
+            r_filter_constrain_min = test_tail_res[7]
 
-            r_filter_rank += (1+r_filter_s)
-            r_rank += (1+r_s)
-            r_filter_reci_rank += np.divide(1.0, (1+r_filter_s))
-            r_reci_rank += np.divide(1.0, (1+r_s))
+            if (r_filter_s < 10): current_lp_res['r_filter_tot'] += 1
+            if (r_s < 10): current_lp_res['r_tot'] += 1
+            if (r_filter_s < 3): current_lp_res['r3_filter_tot'] += 1
+            if (r_s < 3): current_lp_res['r3_tot'] += 1
+
+            if (r_filter_s < 1):
+                current_lp_res['r1_filter_tot'] += 1
+            elif (r_filter_min == 1):
+                current_lp_res['r_filter_gen_err'] += 1
+            elif (r_filter_min == 2):
+                current_lp_res['r_filter_spec_err'] += 1
+            else:
+                current_lp_res['r_filter_mis_err'] += 1
+
+            if (r_s < 1):
+                current_lp_res['r1_tot'] += 1
+            elif (r_min == 1):
+                current_lp_res['r_gen_err'] += 1
+            elif (r_min == 2):
+                current_lp_res['r_spec_err'] += 1
+            else:
+                current_lp_res['r_mis_err'] += 1
+
+
+
+            current_lp_res['r_filter_rank'] += (1+r_filter_s)
+            current_lp_res['r_rank'] += (1+r_s)
+            current_lp_res['r_filter_reci_rank'] += np.divide(1.0, (1+r_filter_s))
+            current_lp_res['r_reci_rank'] += np.divide(1.0, (1+r_s))
 
             #TYPE_C
-            if (r_filter_s_constrain < 10): r_filter_tot_constrain += 1
-            if (r_s_constrain < 10): r_tot_constrain += 1
-            if (r_filter_s_constrain < 3): r3_filter_tot_constrain += 1
-            if (r_s_constrain < 3): r3_tot_constrain += 1
-            if (r_filter_s_constrain < 1): r1_filter_tot_constrain += 1
-            if (r_s_constrain < 1): r1_tot_constrain += 1
+            if (r_filter_s_constrain < 10): current_lp_res['r_filter_tot_constrain'] += 1
+            if (r_s_constrain < 10): current_lp_res['r_tot_constrain'] += 1
+            if (r_filter_s_constrain < 3): current_lp_res['r3_filter_tot_constrain'] += 1
+            if (r_s_constrain < 3): current_lp_res['r3_tot_constrain'] += 1
 
-            r_filter_rank_constrain += (1+r_filter_s_constrain)
-            r_rank_constrain += (1+r_s_constrain)
-            r_filter_reci_rank_constrain += np.divide(1.0, (1+r_filter_s_constrain))
-            r_reci_rank_constrain += np.divide(1.0, (1+r_s_constrain))
+            if (r_filter_s_constrain < 1):
+                current_lp_res['r1_filter_tot_constrain'] += 1
+            elif (r_filter_constrain_min == 1):
+                current_lp_res['r_filter_gen_err_constrain'] += 1
+            elif (r_filter_constrain_min == 2):
+                current_lp_res['r_filter_spec_err_constrain'] += 1
+            else:
+                current_lp_res['r_filter_mis_err_constrain'] += 1
+
+            if (r_s_constrain < 1):
+                current_lp_res['r1_tot_constrain'] += 1
+            elif (r_constrain_min == 1):
+                current_lp_res['r_gen_err_constrain'] += 1
+            elif (r_constrain_min == 2):
+                current_lp_res['r_spec_err_constrain'] += 1
+            else:
+                current_lp_res['r_mis_err_constrain'] += 1
+
+            current_lp_res['r_filter_rank_constrain'] += (1+r_filter_s_constrain)
+            current_lp_res['r_rank_constrain'] += (1+r_s_constrain)
+            current_lp_res['r_filter_reci_rank_constrain'] += np.divide(1.0, (1+r_filter_s_constrain))
+            current_lp_res['r_reci_rank_constrain'] += np.divide(1.0, (1+r_s_constrain))
 
             #head
             if self.test_head != 0:
@@ -514,134 +544,43 @@ class Config(object):
                 l_s_constrain = test_head_res[2]
                 l_filter_s_constrain = test_head_res[3]
 
-                if (l_filter_s < 10): l_filter_tot += 1
-                if (l_s < 10): l_tot += 1
-                if (l_filter_s < 3): l3_filter_tot += 1
-                if (l_s < 3): l3_tot += 1
-                if (l_filter_s < 1): l1_filter_tot += 1
-                if (l_s < 1): l1_tot += 1
+                if (l_filter_s < 10): current_lp_res['l_filter_tot'] += 1
+                if (l_s < 10): current_lp_res['l_tot'] += 1
+                if (l_filter_s < 3): current_lp_res['l3_filter_tot'] += 1
+                if (l_s < 3): current_lp_res['l3_tot'] += 1
+                if (l_filter_s < 1): current_lp_res['l1_filter_tot'] += 1
+                if (l_s < 1): current_lp_res['l1_tot'] += 1
 
-                l_filter_rank += (l_filter_s+1)
-                l_rank += (1+l_s)
-                l_filter_reci_rank += np.divide(1.0, (l_filter_s+1))
-                l_reci_rank += np.divide(1.0, (l_s+1))
+                current_lp_res['l_filter_rank'] += (l_filter_s+1)
+                current_lp_res['l_rank'] += (1+l_s)
+                current_lp_res['l_filter_reci_rank'] += np.divide(1.0, (l_filter_s+1))
+                current_lp_res['l_reci_rank'] += np.divide(1.0, (l_s+1))
 
                 #TYPE_C
-                if (l_filter_s_constrain < 10): l_filter_tot_constrain += 1
-                if (l_s_constrain < 10): l_tot_constrain += 1
-                if (l_filter_s_constrain < 3): l3_filter_tot_constrain += 1
-                if (l_s_constrain < 3): l3_tot_constrain += 1
-                if (l_filter_s_constrain < 1): l1_filter_tot_constrain += 1
-                if (l_s_constrain < 1): l1_tot_constrain += 1
+                if (l_filter_s_constrain < 10): current_lp_res['l_filter_tot_constrain'] += 1
+                if (l_s_constrain < 10): current_lp_res['l_tot_constrain'] += 1
+                if (l_filter_s_constrain < 3): current_lp_res['l3_filter_tot_constrain'] += 1
+                if (l_s_constrain < 3): current_lp_res['l3_tot_constrain'] += 1
+                if (l_filter_s_constrain < 1): current_lp_res['l1_filter_tot_constrain'] += 1
+                if (l_s_constrain < 1): current_lp_res['l1_tot_constrain'] += 1
 
-                l_filter_rank_constrain += (l_filter_s_constrain+1)
-                l_rank_constrain += (1+l_s_constrain)
-                l_filter_reci_rank_constrain += np.divide(1.0, (l_filter_s_constrain+1))
-                l_reci_rank_constrain += np.divide(1.0, (l_s_constrain+1))
+                current_lp_res['l_filter_rank_constrain'] += (l_filter_s_constrain+1)
+                current_lp_res['l_rank_constrain'] += (1+l_s_constrain)
+                current_lp_res['l_filter_reci_rank_constrain'] += np.divide(1.0, (l_filter_s_constrain+1))
+                current_lp_res['l_reci_rank_constrain'] += np.divide(1.0, (l_s_constrain+1))
 
             if index == 0: sys.stdout.write("\r# of test triples processed: {}".format(i * self.N_THREADS_LP))
 
             test_triples_done += 1
 
-
             if test_triples_done % 100 == 0:
                 with open(self.test_log_path+"thread"+str(index), "w") as f:
                     f.write(str(i)+'\n')
+                    for key in current_lp_res.keys():
+                        f.write(str(current_lp_res[key])+'\n')
 
-                    f.write(str(r_filter_tot)+'\n')
-                    f.write(str(r_tot)+'\n')
-                    f.write(str(r3_filter_tot)+'\n')
-                    f.write(str(r3_tot)+'\n')
-                    f.write(str(r1_filter_tot)+'\n')
-                    f.write(str(r1_tot)+'\n')
-                    f.write(str(r_filter_rank)+'\n')
-                    f.write(str(r_rank)+'\n')
-                    f.write(str(r_filter_reci_rank)+'\n')
-                    f.write(str(r_reci_rank)+'\n')
-                    f.write(str(r_filter_tot_constrain)+'\n')
-                    f.write(str(r_tot_constrain)+'\n')
-                    f.write(str(r3_filter_tot_constrain)+'\n')
-                    f.write(str(r3_tot_constrain)+'\n')
-                    f.write(str(r1_filter_tot_constrain)+'\n')
-                    f.write(str(r1_tot_constrain)+'\n')
-                    f.write(str(r_filter_rank_constrain)+'\n')
-                    f.write(str(r_rank_constrain)+'\n')
-                    f.write(str(r_filter_reci_rank_constrain)+'\n')
-                    f.write(str(r_reci_rank_constrain)+'\n')
+        self.lp_res[index] = current_lp_res
 
-                    if self.test_head != 0:
-                        f.write(str(l_filter_tot)+'\n')
-                        f.write(str(l_tot)+'\n')
-                        f.write(str(l3_filter_tot)+'\n')
-                        f.write(str(l3_tot)+'\n')
-                        f.write(str(l1_filter_tot)+'\n')
-                        f.write(str(l1_tot)+'\n')
-                        f.write(str(l_filter_rank)+'\n')
-                        f.write(str(l_rank)+'\n')
-                        f.write(str(l_filter_reci_rank)+'\n')
-                        f.write(str(l_reci_rank)+'\n')
-                        f.write(str(l_filter_tot_constrain)+'\n')
-                        f.write(str(l_tot_constrain)+'\n')
-                        f.write(str(l3_filter_tot_constrain)+'\n')
-                        f.write(str(l3_tot_constrain)+'\n')
-                        f.write(str(l1_filter_tot_constrain)+'\n')
-                        f.write(str(l1_tot_constrain)+'\n')
-                        f.write(str(l_filter_rank_constrain)+'\n')
-                        f.write(str(l_rank_constrain)+'\n')
-                        f.write(str(l_filter_reci_rank_constrain)+'\n')
-                        f.write(str(l_reci_rank_constrain)+'\n')
-
-
-        #tail
-        self.lp_res[index] = {'r_filter_tot':r_filter_tot,
-                              'r_tot':r_tot,
-                              'r3_filter_tot':r3_filter_tot,
-                              'r3_tot':r3_tot,
-                              'r1_filter_tot':r1_filter_tot,
-                              'r1_tot':r1_tot,
-
-                              'r_filter_rank':r_filter_rank,
-                              'r_rank':r_rank,
-                              'r_filter_reci_rank':r_filter_reci_rank,
-                              'r_reci_rank':r_reci_rank,
-
-                              'r_filter_tot_constrain':r_filter_tot_constrain,
-                              'r_tot_constrain':r_tot_constrain,
-                              'r3_filter_tot_constrain':r3_filter_tot_constrain,
-                              'r3_tot_constrain': r3_tot_constrain,
-                              'r1_filter_tot_constrain':r1_filter_tot_constrain,
-                              'r1_tot_constrain':r1_tot_constrain,
-
-                              'r_filter_rank_constrain':r_filter_rank_constrain,
-                              'r_rank_constrain':r_rank_constrain,
-                              'r_filter_reci_rank_constrain':r_filter_reci_rank_constrain,
-                              'r_reci_rank_constrain':r_reci_rank_constrain}
-
-        #head
-        if self.test_head != 0:
-            self.lp_res[index]['l_filter_tot'] = l_filter_tot
-            self.lp_res[index]['l_tot'] = l_tot
-            self.lp_res[index]['l3_filter_tot'] = l3_filter_tot
-            self.lp_res[index]['l3_tot'] = l3_tot
-            self.lp_res[index]['l1_filter_tot'] = l1_filter_tot
-            self.lp_res[index]['l1_tot'] = l1_tot
-
-            self.lp_res[index]['l_filter_rank'] = l_filter_rank
-            self.lp_res[index]['l_rank'] = l_rank
-            self.lp_res[index]['l_filter_reci_rank'] = l_filter_reci_rank
-            self.lp_res[index]['l_reci_rank'] = l_reci_rank
-
-            self.lp_res[index]['l_filter_tot_constrain'] = l_filter_tot_constrain
-            self.lp_res[index]['l_tot_constrain'] = l_tot_constrain
-            self.lp_res[index]['l3_filter_tot_constrain'] = l3_filter_tot_constrain
-            self.lp_res[index]['l3_tot_constrain'] = l3_tot_constrain
-            self.lp_res[index]['l1_filter_tot_constrain'] = l1_filter_tot_constrain
-            self.lp_res[index]['l1_tot_constrain'] = l1_tot_constrain
-
-            self.lp_res[index]['l_filter_rank_constrain'] = l_filter_rank_constrain
-            self.lp_res[index]['l_rank_constrain'] = l_rank_constrain
-            self.lp_res[index]['l_filter_reci_rank_constrain'] = l_filter_reci_rank_constrain
-            self.lp_res[index]['l_reci_rank_constrain'] = l_reci_rank_constrain
 
 
     def test(self):
@@ -653,11 +592,40 @@ class Config(object):
                 test_time_start = time.time()
 
                 if self.test_link_prediction:
-                    l1_filter_tot = l1_tot = r1_tot = r1_filter_tot = l_tot = r_tot = l_filter_rank = l_rank = l_filter_reci_rank = l_reci_rank = 0.0
-                    l3_filter_tot = l3_tot = r3_tot = r3_filter_tot = l_filter_tot = r_filter_tot = r_filter_rank = r_rank = r_filter_reci_rank = r_reci_rank = 0.0
-                    #TYPE_C
-                    l1_filter_tot_constrain = l1_tot_constrain = r1_tot_constrain = r1_filter_tot_constrain = l_tot_constrain = r_tot_constrain = l_filter_rank_constrain = l_rank_constrain = l_filter_reci_rank_constrain = l_reci_rank_constrain = 0.0
-                    l3_filter_tot_constrain = l3_tot_constrain = r3_tot_constrain = r3_filter_tot_constrain = l_filter_tot_constrain = r_filter_tot_constrain = r_filter_rank_constrain = r_rank_constrain = r_filter_reci_rank_constrain = r_reci_rank_constrain = 0.0
+                    d = {
+                        'r_tot' : 0.0, 'r_filter_tot' : 0.0, 'r_tot_constrain' : 0.0, 'r_filter_tot_constrain' : 0.0,
+                        'r1_tot' : 0.0, 'r1_filter_tot' : 0.0, 'r1_tot_constrain' : 0.0, 'r1_filter_tot_constrain' : 0.0,
+                        'r3_tot' : 0.0, 'r3_filter_tot' : 0.0,  'r3_tot_constrain' : 0.0, 'r3_filter_tot_constrain' : 0.0,
+                        'r_rank' : 0.0, 'r_filter_rank' : 0.0, 'r_rank_constrain' : 0.0, 'r_filter_rank_constrain' : 0.0,
+                        'r_reci_rank' : 0.0,'r_filter_reci_rank' : 0.0, 'r_reci_rank_constrain' : 0.0, 'r_filter_reci_rank_constrain' : 0.0,
+
+                        'r_mis_err' : 0.0, 'r_spec_err' : 0.0, 'r_gen_err' : 0.0,
+                        'r_filter_mis_err' : 0.0, 'r_filter_spec_err' : 0.0, 'r_filter_gen_err' : 0.0,
+                        'r_mis_err_constrain' : 0.0, 'r_spec_err_constrain' : 0.0, 'r_gen_err_constrain' : 0.0,
+                        'r_filter_mis_err_constrain' : 0.0, 'r_filter_spec_err_constrain' : 0.0, 'r_filter_gen_err_constrain' : 0.0
+                    }
+
+                    if self.test_head != 0:
+                        d['l_tot'] = 0.0
+                        d['l_filter_tot'] = 0.0
+                        d['l_tot_constrain'] = 0.0
+                        d['l_filter_tot_constrain'] = 0.0
+                        d['l1_tot'] = 0.0
+                        d['l1_filter_tot'] = 0.0
+                        d['l1_tot_constrain'] = 0.0
+                        d['l1_filter_tot_constrain'] = 0.0
+                        d['l3_tot'] = 0.0
+                        d['l3_filter_tot'] = 0.0
+                        d['l3_tot_constrain'] = 0.0
+                        d['l3_filter_tot_constrain'] = 0.0
+                        d['l_rank'] = 0.0
+                        d['l_filter_rank'] = 0.0
+                        d['l_rank_constrain'] = 0.0
+                        d['l_filter_rank_constrain'] = 0.0
+                        d['l_reci_rank'] = 0.0
+                        d['l_filter_reci_rank'] = 0.0
+                        d['l_reci_rank_constrain'] = 0.0
+                        d['l_filter_reci_rank_constrain'] = 0.0
 
 
                     testTotal = self.lib.getTestTotal()
@@ -679,138 +647,45 @@ class Config(object):
                     for t in threads_array:
                         t.start()
 
-                    idx = 0
                     for t in threads_array:
                         t.join()
 
                     for res in self.lp_res:
-                        #tail
-                        r_filter_tot += res['r_filter_tot']
-                        r_tot += res['r_tot']
-                        r3_filter_tot += res['r3_filter_tot']
-                        r3_tot += res['r3_tot']
-                        r1_filter_tot += res['r1_filter_tot']
-                        r1_tot += res['r1_tot']
-                        r_filter_rank += res['r_filter_rank']
-                        r_rank += res['r_rank']
-                        r_filter_reci_rank += res['r_filter_reci_rank']
-                        r_reci_rank += res['r_reci_rank']
+                        for key in res.keys():
+                            d[key] += res[key]
 
-                        #tail TYPE_C
-                        r_filter_tot_constrain += res['r_filter_tot_constrain']
-                        r_tot_constrain += res['r_tot_constrain']
-                        r3_filter_tot_constrain += res['r3_filter_tot_constrain']
-                        r3_tot_constrain += res['r3_tot_constrain']
-                        r1_filter_tot_constrain += res['r1_filter_tot_constrain']
-                        r1_tot_constrain += res['r1_tot_constrain']
-                        r_filter_rank_constrain += res['r_filter_rank_constrain']
-                        r_rank_constrain += res['r_rank_constrain']
-                        r_filter_reci_rank_constrain += res['r_filter_reci_rank_constrain']
-                        r_reci_rank_constrain += res['r_reci_rank_constrain']
-
-                        if self.test_head != 0:
-                            #head
-                            l_filter_tot += res['l_filter_tot']
-                            l_tot += res['l_tot']
-                            l3_filter_tot += res['l3_filter_tot']
-                            l3_tot += res['l3_tot']
-                            l1_filter_tot += res['l1_filter_tot']
-                            l1_tot += res['l1_tot']
-                            l_filter_rank += res['l_filter_rank']
-                            l_rank += res['l_rank']
-                            l_filter_reci_rank += res['l_filter_reci_rank']
-                            l_reci_rank += res['l_reci_rank']
-
-                            #head TYPE_C
-                            l_filter_tot_constrain += res['l_filter_tot_constrain']
-                            l_tot_constrain += res['l_tot_constrain']
-                            l3_filter_tot_constrain += res['l3_filter_tot_constrain']
-                            l3_tot_constrain += res['l3_tot_constrain']
-                            l1_filter_tot_constrain += res['l1_filter_tot_constrain']
-                            l1_tot_constrain += res['l1_tot_constrain']
-                            l_filter_rank_constrain += res['l_filter_rank_constrain']
-                            l_rank_constrain += res['l_rank_constrain']
-                            l_filter_reci_rank_constrain += res['l_filter_reci_rank_constrain']
-                            l_reci_rank_constrain += res['l_reci_rank_constrain']
-
-
-                    #tail
-                    r_rank = np.divide(r_rank, testTotal)
-                    r_reci_rank = np.divide(r_reci_rank, testTotal)
-                    r_tot = np.divide(r_tot, testTotal)
-                    r3_tot = np.divide(r3_tot, testTotal)
-                    r1_tot = np.divide(r1_tot, testTotal)
-                    r_filter_rank = np.divide(r_filter_rank, testTotal)
-                    r_filter_reci_rank = np.divide(r_filter_reci_rank, testTotal)
-                    r_filter_tot = np.divide(r_filter_tot, testTotal)
-                    r3_filter_tot = np.divide(r3_filter_tot, testTotal)
-                    r1_filter_tot = np.divide(r1_filter_tot, testTotal)
-
-                    #TYPE_C
-                    r_rank_constrain = np.divide(r_rank_constrain, testTotal)
-                    r_reci_rank_constrain = np.divide(r_reci_rank_constrain, testTotal)
-                    r_tot_constrain = np.divide(r_tot_constrain, testTotal)
-                    r3_tot_constrain = np.divide(r3_tot_constrain, testTotal)
-                    r1_tot_constrain = np.divide(r1_tot_constrain, testTotal)
-                    r_filter_rank_constrain = np.divide(r_filter_rank_constrain, testTotal)
-                    r_filter_reci_rank_constrain = np.divide(r_filter_reci_rank_constrain, testTotal)
-                    r_filter_tot_constrain = np.divide(r_filter_tot_constrain, testTotal)
-                    r3_filter_tot_constrain = np.divide(r3_filter_tot_constrain, testTotal)
-                    r1_filter_tot_constrain = np.divide(r1_filter_tot_constrain, testTotal)
-
-                    if self.test_head != 0:
-                        #head
-                        l_rank = np.divide(l_rank, testTotal)
-                        l_reci_rank = np.divide(l_reci_rank, testTotal)
-                        l_tot = np.divide(l_tot, testTotal)
-                        l3_tot = np.divide(l3_tot, testTotal)
-                        l1_tot = np.divide(l1_tot, testTotal)
-                        l_filter_rank = np.divide(l_filter_rank, testTotal)
-                        l_filter_reci_rank = np.divide(l_filter_reci_rank, testTotal)
-                        l_filter_tot = np.divide(l_filter_tot, testTotal)
-                        l3_filter_tot = np.divide(l3_filter_tot, testTotal)
-                        l1_filter_tot = np.divide(l1_filter_tot, testTotal)
-
-                        #TYPE_C
-                        l_rank_constrain = np.divide(l_rank_constrain, testTotal)
-                        l_reci_rank_constrain = np.divide(l_reci_rank_constrain, testTotal)
-                        l_tot_constrain = np.divide(l_tot_constrain, testTotal)
-                        l3_tot_constrain = np.divide(l3_tot_constrain, testTotal)
-                        l1_tot_constrain = np.divide(l1_tot_constrain, testTotal)
-                        l_filter_rank_constrain = np.divide(l_filter_rank_constrain, testTotal)
-                        l_filter_reci_rank_constrain = np.divide(l_filter_reci_rank_constrain, testTotal)
-                        l_filter_tot_constrain = np.divide(l_filter_tot_constrain, testTotal)
-                        l3_filter_tot_constrain = np.divide(l3_filter_tot_constrain, testTotal)
-                        l1_filter_tot_constrain = np.divide(l1_filter_tot_constrain, testTotal)
+                    for key in d.keys():
+                        d[key] = np.divide(d[key], testTotal)
 
 
                     print("\n ========== LINK PREDICTION RESULTS ==========\nNo type constraint results:")
-                    print("{:<20}{:<20}{:<20}{:<20}{:<20}{:<20}".format("metric", "MRR", "MR", "hit@10", "hit@3", "hit@1"))
-                    if self.test_head != 0: print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}".format("l(raw):",l_reci_rank, l_rank, l_tot, l3_tot, l1_tot))
-                    print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}".format("r(raw):", r_reci_rank, r_rank, r_tot, r3_tot, r1_tot))
-                    if self.test_head != 0: print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}\n".format("mean(raw):", np.divide((l_reci_rank+r_reci_rank),2), np.divide((l_rank+r_rank),2), np.divide((l_tot+r_tot),2), np.divide((l3_tot+r3_tot),2), np.divide((l1_tot+r1_tot),2)))
+                    print("{:<20}{:<20}{:<20}{:<20}{:<20}{:<20}{:<20}{:<20}{:<20}".format("metric", "MRR", "MR", "hit@10", "hit@3", "hit@1", "hit@1GenError", "hit@1SpecError", "hit@1MisError"))
+                    if self.test_head != 0: print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}".format("l(raw):",d['l_reci_rank'], d['l_rank'], d['l_tot'], d['l3_tot'], d['l1_tot']))
+                    print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}".format("r(raw):", d['r_reci_rank'], d['r_rank'], d['r_tot'], d['r3_tot'], d['r1_tot'], d['r_gen_err'], d['r_spec_err'], d['r_mis_err']))
+                    if self.test_head != 0: print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}\n".format("mean(raw):", np.divide((d['l_reci_rank']+d['r_reci_rank']),2), np.divide((d['l_rank']+d['r_rank']),2), np.divide((d['l_tot']+d['r_tot']),2), np.divide((d['l3_tot']+d['r3_tot']),2), np.divide((d['l1_tot']+d['r1_tot']),2)))
 
-                    if self.test_head != 0: print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}".format("l(filter):", l_filter_reci_rank, l_filter_rank, l_filter_tot, l3_filter_tot, l1_filter_tot))
-                    print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}".format('r(filter):', r_filter_reci_rank, r_filter_rank, r_filter_tot, r3_filter_tot, r1_filter_tot))
-                    if self.test_head != 0: print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}\n".format('mean(filter):', np.divide((l_filter_reci_rank+r_filter_reci_rank),2), np.divide((l_filter_rank+r_filter_rank),2), np.divide((l_filter_tot+r_filter_tot),2), np.divide((l3_filter_tot+r3_filter_tot),2), np.divide((l1_filter_tot+r1_filter_tot),2)))
+                    if self.test_head != 0: print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}".format("l(filter):", d['l_filter_reci_rank'], d['l_filter_rank'], d['l_filter_tot'], d['l3_filter_tot'], d['l1_filter_tot']))
+                    print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}".format('r(filter):', d['r_filter_reci_rank'], d['r_filter_rank'], d['r_filter_tot'], d['r3_filter_tot'], d['r1_filter_tot'], d['r_filter_gen_err'], d['r_filter_spec_err'], d['r_filter_mis_err']))
+                    if self.test_head != 0: print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}\n".format('mean(filter):', np.divide((d['l_filter_reci_rank']+d['r_filter_reci_rank']),2), np.divide((d['l_filter_rank']+d['r_filter_rank']),2), np.divide((d['l_filter_tot']+d['r_filter_tot']),2), np.divide((d['l3_filter_tot']+d['r3_filter_tot']),2), np.divide((d['l1_filter_tot']+d['r1_filter_tot']),2)))
 
                     print("Type constraint results:")
-                    print("{:<20}{:<20}{:<20}{:<20}{:<20}{:<20}".format("metric", "MRR", "MR", "hit@10", "hit@3", "hit@1"))
-                    if self.test_head != 0: print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}".format('l(raw):', l_reci_rank_constrain, l_rank_constrain, l_tot_constrain, l3_tot_constrain, l1_tot_constrain))
-                    print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}".format('r(raw):', r_reci_rank_constrain, r_rank_constrain, r_tot_constrain, r3_tot_constrain, r1_tot_constrain))
-                    if self.test_head != 0: print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}\n".format('mean(raw):', np.divide((l_reci_rank_constrain+r_reci_rank_constrain),2), np.divide((l_rank_constrain+r_rank_constrain),2), np.divide((l_tot_constrain+r_tot_constrain),2), np.divide((l3_tot_constrain+r3_tot_constrain),2), np.divide((l1_tot_constrain+r1_tot_constrain),2)))
+                    print("{:<20}{:<20}{:<20}{:<20}{:<20}{:<20}{:<20}{:<20}{:<20}".format("metric", "MRR", "MR", "hit@10", "hit@3", "hit@1", "hit@1GenError", "hit@1SpecError", "hit@1MisError"))
+                    if self.test_head != 0: print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}".format('l(raw):', d['l_reci_rank_constrain'], d['l_rank_constrain'], d['l_tot_constrain'], d['l3_tot_constrain'], d['l1_tot_constrain']))
+                    print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}".format('r(raw):', d['r_reci_rank_constrain'], d['r_rank_constrain'], d['r_tot_constrain'], d['r3_tot_constrain'], d['r1_tot_constrain'], d['r_gen_err_constrain'], d['r_spec_err_constrain'], d['r_mis_err_constrain']))
+                    if self.test_head != 0: print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}\n".format('mean(raw):', np.divide((d['l_reci_rank_constrain']+d['r_reci_rank_constrain']),2), np.divide((d['l_rank_constrain']+d['r_rank_constrain']),2), np.divide((d['l_tot_constrain']+d['r_tot_constrain']),2), np.divide((d['l3_tot_constrain']+d['r3_tot_constrain']),2), np.divide((d['l1_tot_constrain']+d['r1_tot_constrain']),2)))
 
-                    if self.test_head != 0: print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}".format('l(filter):', l_filter_reci_rank_constrain, l_filter_rank_constrain, l_filter_tot_constrain, l3_filter_tot_constrain, l1_filter_tot_constrain))
-                    print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}".format('r(filter):', r_filter_reci_rank_constrain, r_filter_rank_constrain, r_filter_tot_constrain, r3_filter_tot_constrain, r1_filter_tot_constrain))
-                    if self.test_head != 0: print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}\n".format('mean(filter):', np.divide((l_filter_reci_rank_constrain+r_filter_reci_rank_constrain),2), np.divide((l_filter_rank_constrain+r_filter_rank_constrain),2), np.divide((l_filter_tot_constrain+r_filter_tot_constrain),2), np.divide((l3_filter_tot_constrain+r3_filter_tot_constrain),2), np.divide((l1_filter_tot_constrain+r1_filter_tot_constrain),2)))
+                    if self.test_head != 0: print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}".format('l(filter):', d['l_filter_reci_rank_constrain'], d['l_filter_rank_constrain'], d['l_filter_tot_constrain'], d['l3_filter_tot_constrain'], d['l1_filter_tot_constrain']))
+                    print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}".format('r(filter):', d['r_filter_reci_rank_constrain'], d['r_filter_rank_constrain'], d['r_filter_tot_constrain'], d['r3_filter_tot_constrain'], d['r1_filter_tot_constrain'], d['r_filter_gen_err_constrain'], d['r_filter_spec_err_constrain'], d['r_filter_mis_err_constrain']))
+                    if self.test_head != 0: print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}\n".format('mean(filter):', np.divide((d['l_filter_reci_rank_constrain']+d['r_filter_reci_rank_constrain']),2), np.divide((d['l_filter_rank_constrain']+d['r_filter_rank_constrain']),2), np.divide((d['l_filter_tot_constrain']+d['r_filter_tot_constrain']),2), np.divide((d['l3_filter_tot_constrain']+d['r3_filter_tot_constrain']),2), np.divide((d['l1_filter_tot_constrain']+d['r1_filter_tot_constrain']),2)))
 
                     #remove test checkpoint
+                    print()
                     for index in range(0, self.N_THREADS_LP):
                         try:
                             os.remove(self.test_log_path+"thread"+str(index))
                         except:
-                            print("File " + self.test_log_path+"thread"+str(index) + " not founded")
-
+                            print(" LOG:\tFile " + self.test_log_path+"thread"+str(index) + " not founded")
+                    print()
 
                 if self.test_triple_classification:
                     self.lib.getValidBatch(self.valid_pos_h_addr, self.valid_pos_t_addr, self.valid_pos_r_addr, self.valid_neg_h_addr, self.valid_neg_t_addr, self.valid_neg_r_addr)
@@ -825,14 +700,12 @@ class Config(object):
 
                     self.lib.test_triple_classification(self.relThresh_addr, res_pos.__array_interface__['data'][0], res_neg.__array_interface__['data'][0], self.acc_addr)
 
+
+
                 test_time_elapsed = time.time() - test_time_start
                 print("\nElapsed test time (seconds): {}".format(test_time_elapsed))
 
 
-
-
-
-    #EDIT
     def valid(self):
         with self.graph.as_default():
             with self.sess.as_default():
@@ -842,7 +715,6 @@ class Config(object):
                 res_pos = self.test_step(self.valid_pos_h, self.valid_pos_t, self.valid_pos_r)
                 res_neg = self.test_step(self.valid_neg_h, self.valid_neg_t, self.valid_neg_r)
                 self.lib.getBestThreshold(self.relThresh_addr, res_pos.__array_interface__['data'][0], res_neg.__array_interface__['data'][0])
-
                 self.lib.test_triple_classification(self.relThresh_addr, res_pos.__array_interface__['data'][0], res_neg.__array_interface__['data'][0], self.acc_addr)
 
 
@@ -858,7 +730,7 @@ class Config(object):
         Returns:
             list: k possible head entity ids
         '''
-        self.init_link_prediction()
+        # self.init_link_prediction()
         if self.importName != None:
             self.restore_tensorflow()
         test_h = np.array(range(self.entTotal))
@@ -867,7 +739,6 @@ class Config(object):
         res = self.test_step(test_h, test_t, test_r).reshape(-1).argsort()[:k]
         print(res)
         return res
-
 
     def predict_tail_entity(self, h, r, k):
         r'''This mothod predicts the top k tail entities given head entity and relation.
@@ -880,7 +751,7 @@ class Config(object):
         Returns:
             list: k possible tail entity ids
         '''
-        self.init_link_prediction()
+        # self.init_link_prediction()
         if self.importName != None:
             self.restore_tensorflow()
         test_h = np.array([h] * self.entTotal)
@@ -901,7 +772,7 @@ class Config(object):
         Returns:
             list: k possible relation ids
         '''
-        self.init_link_prediction()
+        # self.init_link_prediction()
         if self.importName != None:
             self.restore_tensorflow()
         test_h = np.array([h] * self.relTotal)

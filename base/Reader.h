@@ -362,4 +362,89 @@ void importTypeFiles() {
 	fclose(f_type);
 }
 
+
+INT *sup_lef;
+INT *sup_rig;
+INT *sub_lef;
+INT *sub_rig;
+INT *sup_type;
+INT *sub_type;
+
+extern "C"
+void importOntologyFiles(){
+    sup_lef = (INT *)calloc(entityTotal, sizeof(INT));
+    sup_rig = (INT *)calloc(entityTotal, sizeof(INT));
+    sub_lef = (INT *)calloc(entityTotal, sizeof(INT));
+    sub_rig = (INT *)calloc(entityTotal, sizeof(INT));
+
+    std::cout << "Reading " << inPath << "ontology_constrain.txt" << std::endl;
+    FILE *f_type = fopen((inPath + "ontology_constrain.txt").c_str(), "r");
+    if (f_type == nullptr) {
+        std::cout << '`' << inPath << "ontology_constrain.txt" << '`' << " does not exist" << std::endl;
+        return;
+    }
+    INT tmp;
+    INT totOntology;
+    tmp = fscanf(f_type, "%ld", &totOntology);
+
+
+    INT total_sup = 0;
+    INT total_sub = 0;
+    for (INT i = 0; i < totOntology; i++) {
+        INT ent, tot;
+        tmp = fscanf(f_type, "%ld%ld", &ent, &tot);
+
+        for (INT j = 0; j < tot; j++) {
+            tmp = fscanf(f_type, "%ld", &tmp);
+            total_sup++;
+        }
+        tmp = fscanf(f_type, "%ld%ld", &ent, &tot);
+        for (INT j = 0; j < tot; j++) {
+            tmp = fscanf(f_type, "%ld", &tmp);
+            total_sub++;
+        }
+    }
+    fclose(f_type);
+
+
+    sup_type = (INT *)calloc(total_sup, sizeof(INT));
+    sub_type = (INT *)calloc(total_sub, sizeof(INT));
+    total_sup = 0;
+    total_sub = 0;
+    f_type = fopen((inPath + "ontology_constrain.txt").c_str(), "r");
+    if (f_type == nullptr) {
+        std::cout << '`' << inPath << "ontology_constrain.txt" << '`' << " does not exist" << std::endl;
+        return;
+    }
+    tmp = fscanf(f_type, "%ld", &tmp);
+
+
+
+    for (INT i = 0; i < totOntology; i++) {
+        INT ent, tot;
+        tmp = fscanf(f_type, "%ld%ld", &ent, &tot);
+
+        sup_lef[ent] = total_sup;
+        for (INT j = 0; j < tot; j++) {
+            tmp = fscanf(f_type, "%ld", &sup_type[total_sup]);
+            total_sup++;
+        }
+        sup_rig[ent] = total_sup;
+        std::sort(sup_type + sup_lef[ent], sup_type + sup_rig[ent]);
+
+
+        tmp = fscanf(f_type, "%ld%ld", &ent, &tot);
+        sub_lef[ent] = total_sub;
+        for (INT j = 0; j < tot; j++) {
+            tmp = fscanf(f_type, "%ld", &sub_type[total_sub]);
+            total_sub++;
+        }
+        sub_rig[ent] = total_sub;
+        std::sort(sub_type + sub_lef[ent], sub_type + sub_rig[ent]);
+    }
+    fclose(f_type);
+
+}
+
+
 #endif

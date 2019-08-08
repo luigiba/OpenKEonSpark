@@ -90,8 +90,6 @@ def create_model(con):
         else:
             optimizer = tf.train.GradientDescentOptimizer(con.alpha)
 
-
-
         global_step = tf.train.get_or_create_global_step()
         train_op = optimizer.minimize(trainModel.loss, global_step=global_step)
         init_op = tf.initialize_all_variables()
