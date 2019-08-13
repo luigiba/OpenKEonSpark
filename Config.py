@@ -175,6 +175,11 @@ class Config(object):
             if self.valid_triple_classification:
                 self.init_valid_triple_classification()
 
+    def set_n_threads_LP(self, n):
+        self.N_THREADS_LP = n
+        self.lp_res = []
+        for _ in range(self.N_THREADS_LP): self.lp_res.append({})
+
     def set_mini_batch(self):
         tot = None
 
@@ -402,7 +407,6 @@ class Config(object):
         return predict
 
 
-
     def test_lp_range(self, index, lef, rig):
         current_lp_res = {
             'r_tot' : 0.0, 'r_filter_tot' : 0.0, 'r_tot_constrain' : 0.0, 'r_filter_tot_constrain' : 0.0,
@@ -452,7 +456,6 @@ class Config(object):
             with open(self.test_log_path+"thread"+str(index), 'r') as f:
                 last_i = int(f.readline())
                 print("Restoring test results from index {}".format(last_i))
-
                 lef = last_i + 1
                 for key in current_lp_res.keys():
                     current_lp_res[key] = float(f.readline())
@@ -580,7 +583,6 @@ class Config(object):
                         f.write(str(current_lp_res[key])+'\n')
 
         self.lp_res[index] = current_lp_res
-
 
 
     def test(self):

@@ -232,7 +232,8 @@ def main_fun(argv, ctx):
 
 
             if (task_index == 0) and (not sess.should_stop()) and (g >= to_reach_step):
-                to_reach_step += stopping_step
+                while (g >= to_reach_step):
+                    to_reach_step += stopping_step
 
                 ################## ACCURACY ##################
                 feed_dict[trainModel.predict_h] = con.valid_pos_h

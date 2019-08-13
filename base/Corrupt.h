@@ -120,16 +120,6 @@ INT corrupt(INT h, INT r){
 	INT rr = tail_rig[r];
 	INT t;
 
-    //EDIT
-//	while (ll < rr){
-//	    t = tail_type[ll];
-//	    if (not _find(h, t, r)) {
-//	        return t;
-//	    }
-//	    ll++;
-//	}
-//	return corrupt_head(0, h, r);
-
     INT loop = 0;
 	while(1) {
 		t = tail_type[rand(ll, rr)];

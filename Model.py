@@ -67,7 +67,7 @@ class Model(object):
 		self.negative_t = tf.transpose(tf.reshape(self.batch_t[config.batch_size:config.batch_seq_size], [config.negative_ent + config.negative_rel, -1]), perm = [1, 0])
 		self.negative_r = tf.transpose(tf.reshape(self.batch_r[config.batch_size:config.batch_seq_size], [config.negative_ent + config.negative_rel, -1]), perm = [1, 0])
 		self.negative_y = tf.transpose(tf.reshape(self.batch_y[config.batch_size:config.batch_seq_size], [config.negative_ent + config.negative_rel, -1]), perm = [1, 0])
-		
+
 		self.predict_h = tf.placeholder(tf.int64, [None])
 		self.predict_t = tf.placeholder(tf.int64, [None])
 		self.predict_r = tf.placeholder(tf.int64, [None])

@@ -113,12 +113,10 @@ INT* testTail(INT index, REAL *con) {
             if (value < minimal) {
                 r_s += 1;
 
-
                 if (value < r_min_s){
                     r_min_s = value;
                     r_min = j;
                 }
-
 
                 if (not _find(h, j, r)){
                     r_filter_s += 1;

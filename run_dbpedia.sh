@@ -2,6 +2,7 @@ echo "====================================== Params ============================
 echo "$1"
 echo "$2"
 echo "$3"
+echo "$4"
 
 echo "====================================== Clearning res_spark directory ======================================"
 rm /home/luigi/IdeaProjects/OpenKE_new_Spark/res_spark/*
@@ -18,6 +19,12 @@ m=$((n-1))
 
 for i in `seq 0 $m`
 do
+  if [ -f /content/drive/My\ Drive/DBpedia/$n/$i/model/thread0 ]; then
+    echo "====================================== Test for batch $i ======================================"
+	  python3 $WORK_DIR_PREFIX/test.py $i $n $2 $3 1 | tee /content/drive/My\ Drive/DBpedia/$n/$i/res.txt
+	  continue
+  fi
+
   if [ -f /content/drive/My\ Drive/DBpedia/$n/$i/res.txt ]; then
     echo "Batch $i already done; Skipping batch $i"
 	  continue
@@ -53,7 +60,7 @@ do
     --cluster_size $SPARK_WORKER_INSTANCES --num_ps 1 --num_gpus 1 --cpp_lib_path $WORK_DIR_PREFIX/release/Base.so \
 	--input_path /content/drive/My\ Drive/DBpedia/$n/$i/ \
     --output_path $WORK_DIR_PREFIX/res_spark \
-    --alpha 0.0001 --optimizer SGD --train_times 50 --ent_neg_rate 1 --embedding_dimension $2 --margin 1.0 --model $3
+    --alpha $4 --optimizer SGD --train_times 50 --ent_neg_rate 1 --embedding_dimension $2 --margin 1.0 --model $3
 
 
 	echo "====================================== Copying model for batch $i ======================================"
@@ -61,7 +68,11 @@ do
 
 	
 	echo "====================================== Test for batch $i ======================================"
-	python3 $WORK_DIR_PREFIX/test.py $i $n $2 $3 | tee /content/drive/My\ Drive/DBpedia/$n/$i/res.txt
+	if [ $i -eq $m ]; then
+	  python3 $WORK_DIR_PREFIX/test.py $i $n $2 $3 1 | tee /content/drive/My\ Drive/DBpedia/$n/$i/res.txt
+	else
+	  python3 $WORK_DIR_PREFIX/test.py $i $n $2 $3 0 | tee /content/drive/My\ Drive/DBpedia/$n/$i/res.txt
+	fi
 
 done
 

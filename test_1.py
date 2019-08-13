@@ -1,5 +1,6 @@
 from Config import Config
 from TransE import TransE
+from TransH import TransH
 import sys
 # import os
 
@@ -15,8 +16,9 @@ def get_ckpt(p):
 
 #/home/luigi/IdeaProjects/OpenKE_new_Spark/benchmarks/DBpedia
 dataset_path = '/home/luigi/files/stuff/Done/DBpedia/5/0/'
-# dataset_path = '/home/luigi/files/stuff/superuser/9/0/'
+# dataset_path = '/home/luigi/files/stuff/superuser/9/1/'
 path = dataset_path + 'model/'
+# path = '/home/luigi/IdeaProjects/OpenKEonSpark/res_spark/'
 print(path)
 ckpt = get_ckpt(path)
 
@@ -30,7 +32,10 @@ con.init()
 con.set_model_and_session(TransE)
 con.set_import_files(path+ckpt)
 con.set_test_log_path(path)
+con.set_n_threads_LP(1)
 con.test()
+
+con.predict_tail_entity(349585, 5, 10)
 # for i in range(0,100):
 #     con.predict_tail_entity(i,0,1)
 # print(con.acc)

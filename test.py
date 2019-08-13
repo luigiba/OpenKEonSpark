@@ -6,14 +6,14 @@ from TransD import TransD
 import sys
 
 for arg in sys.argv:
-    print(arg)
-    print(type(arg))
+    print(type(arg), arg)
     print("\n")
 
 n = sys.argv[1]
 max = sys.argv[2]
 dim = sys.argv[3]
 model = sys.argv[4]
+lp = sys.argv[5]
 
 
 
@@ -31,7 +31,7 @@ ckpt = get_ckpt(path)
 
 con = Config(cpp_lib_path='/content/OpenKEonSpark/release/Base.so')
 con.set_in_path(dataset_path)
-con.set_test_link_prediction(True)
+con.set_test_link_prediction(bool(lp))
 con.set_test_triple_classification(True)
 con.set_dimension(int(dim))
 con.init()
