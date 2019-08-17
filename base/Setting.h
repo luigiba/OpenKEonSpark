@@ -53,13 +53,11 @@ INT tripleTotal = 0;
 INT testTotal = 0;
 INT trainTotal = 0;
 
-//EDIT
 //training triples with duplicates
 INT trainTotal_ = 0;
 
 INT validTotal = 0;
 
-//EDIT
 INT newBatchTotal = 0;
 
 extern "C"
@@ -82,13 +80,13 @@ INT getTrainTotal() {
 	return trainTotal;
 }
 
-//EDIT
+
 extern "C"
 INT getTrainTotal_() {
 	return trainTotal_;
 }
 
-//EDIT
+
 extern "C"
 INT getBatchTotal() {
     return newBatchTotal;

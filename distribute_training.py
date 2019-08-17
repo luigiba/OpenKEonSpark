@@ -12,18 +12,17 @@ import sys
 import time
 
 
-#if set to Ture prints additional debug information
-DEBUG = True
-
-
 def get_conf_to_update_model(output_path):
+    '''
+    Set the Config class variables necessary to update model tensors
+    '''
     con = Config(init_new_entities=True)
 
     ckpt = None
     with open(output_path + "/checkpoint", 'r') as f:
         first_line = f.readline()
         ckpt = first_line.split(':')[1].strip().replace('"', '')
-    if DEBUG: print("Checkpoint file is: " + ckpt)
+    print("Checkpoint file is: " + ckpt)
 
     con.import_model(ckpt)
 
@@ -31,6 +30,9 @@ def get_conf_to_update_model(output_path):
 
 
 def get_conf(argv=None):
+    '''
+    Set the Config class using the program args
+    '''
     if argv == None: argv = sys.argv
 
     con = Config(cpp_lib_path=argv.cpp_lib_path)
@@ -56,19 +58,22 @@ def get_conf(argv=None):
     con.set_opt_method(argv.optimizer)
     con.init()
 
-    if argv.model.lower() == "transe":
-        con.set_model(TransE)
-    elif argv.model.lower() == "transh":
+    if argv.model.lower() == "transh":
         con.set_model(TransH)
     elif argv.model.lower() == "transr":
         con.set_model(TransR)
-    else:
+    elif argv.model.lower() == "transd":
         con.set_model(TransD)
+    else:
+        con.set_model(TransE)
 
     return con
 
 
 def create_model(con):
+    '''
+    create the model using the Config parameters
+    '''
     with tf.variable_scope("", reuse=None, initializer = tf.contrib.layers.xavier_initializer(uniform = True)):
         trainModel = con.model(config = con)
 
@@ -85,6 +90,7 @@ def create_model(con):
         with tf.name_scope("predict"):
             trainModel.predict_def()
 
+        #allowed Optimization algorithms are Adam and SGD
         if con.opt_method == "Adam" or con.opt_method == "adam":
             optimizer = tf.train.AdamOptimizer(con.alpha)
         else:
@@ -99,10 +105,13 @@ def create_model(con):
 
 
 def get_last_step():
+    '''
+    :return: last global step; 0 if is the first batch
+    '''
     last_global_step = 0
     try:
         if os.path.isfile(sys.argv.output_path+"/checkpoint"):
-            if DEBUG:
+            if sys.argv.debug:
                 print("Checkpoint file founded")
                 print("Reading last global step...")
 
@@ -111,9 +120,9 @@ def get_last_step():
                 last = int(line[len(line)-1].split("-")[1].strip())
                 last_global_step = last
 
-            if DEBUG: print("Last global step: " + str(last_global_step))
+            if sys.argv.debug: print("Last global step: " + str(last_global_step))
         else:
-            if DEBUG: print("Checkpoint file not founded")
+            if sys.argv.debug: print("Checkpoint file not founded")
     except Exception as e:
         print("Error occured during last global step reading:")
         print(e)
@@ -124,59 +133,62 @@ def get_last_step():
 
 
 def main_fun(argv, ctx):
+    '''
+    Continue training on already seen training set / Start training on new batch
+    If the new batch contains new entities, model tensors which depends from entity size are updated accordingly
+    :param argv:
+    :param ctx:
+    '''
     job_name = ctx.job_name
     task_index = ctx.task_index
     sys.argv = argv
 
 
-    if DEBUG: print("Starting cluster and server...")
+    if sys.argv.debug: print("Starting cluster and server...")
     cluster, server = TFNode.start_cluster_server(ctx, num_gpus=argv.num_gpus, rdma=False)
-    if DEBUG: print("Cluster and server started")
+    if sys.argv.debug: print("Cluster and server started")
 
 
     if job_name == "ps":
+        #parameter server
         print("PS: joining...")
         server.join()
-        if DEBUG: print("PS: join finished")
+        if sys.argv.debug: print("PS: join finished")
+
 
     elif job_name == "worker":
+        #worker
         print("WORKER: training...")
-
-        #Online learning
         last_global_step = get_last_step()
-
-
-        #set config
-        if DEBUG: print("Creating conf...")
         con = get_conf()
 
-
+        if sys.argv.debug: print("Creating model...")
         with tf.device(tf.train.replica_device_setter(
             worker_device="/job:worker/task:%d" % task_index,
             cluster=cluster,
             ps_strategy=GreedyLoadBalancingStrategy(num_tasks=argv.num_ps, load_fn=byte_size_load_fn))):
-
-            if DEBUG: print("Creating model...")
             trainModel, global_step, train_op, init_op, saver, summary_op = create_model(con)
 
 
-
-
-        if DEBUG: print("Creating Hooks, Scaffold, FileWriter...")
-
+        if sys.argv.debug: print("Creating Hooks, Scaffold, FileWriter, ConfigProto...")
         iterations = con.train_times * con.nbatches + last_global_step
-
         hooks=[tf.train.StopAtStepHook(last_step=iterations)]
         scaffold = tf.train.Scaffold(init_op=init_op, saver=saver, summary_op=summary_op)
         tf.summary.FileWriter("tensorboard_%d" % ctx.worker_num, graph=tf.get_default_graph())
+        config_monitored = tf.ConfigProto()
+
+        if argv.num_gpus > 0:
+            if sys.argv.debug: print("Setting GPU options...")
+            visible_device_list = ''
+            try:
+                visible_device_list = os.environ["CUDA_VISIBLE_DEVICES"]
+            except KeyError:
+                visible_device_list = '0'
+            gpu_options = tf.GPUOptions(allow_growth = True, visible_device_list = visible_device_list)
+            config_monitored = tf.ConfigProto(gpu_options=gpu_options)
 
 
-        print("Num gpus: " + str(argv.num_gpus))
-        gpu_options = tf.GPUOptions(allow_growth = True, visible_device_list = "0")
-        config_monitored = tf.ConfigProto(gpu_options=gpu_options)
-
-
-        if DEBUG: print("Starting MonitoredTrainingSession...")
+        if sys.argv.debug: print("Starting MonitoredTrainingSession...")
         sess = tf.train.MonitoredTrainingSession(master=server.target,
                                                is_chief=(task_index == 0),
                                                scaffold=scaffold,
@@ -187,7 +199,7 @@ def main_fun(argv, ctx):
                                                hooks=hooks,
                                                summary_dir="tensorboard_%d" % ctx.worker_num
                                                )
-        if DEBUG:
+        if sys.argv.debug:
             print("Monitoring training sessions started")
             print("Task index is: {}".format(task_index))
 
@@ -250,7 +262,7 @@ def main_fun(argv, ctx):
                 con.lib.test_triple_classification(con.relThresh_addr, res_pos.__array_interface__['data'][0], res_neg.__array_interface__['data'][0], con.acc_addr)
                 acc = con.acc[0]
 
-                if DEBUG:
+                if sys.argv.debug:
                     print("\n[ Early Stop Check (Accuracy) ]")
                     print("Best Accuracy = %.10f" %(best_acc))
                     print("Accuracy after run  =  %.10f" %(acc))
@@ -258,12 +270,12 @@ def main_fun(argv, ctx):
                 if acc > best_acc:
                     best_acc = acc
                     wait_steps_acc = 0
-                    if DEBUG: print("New best Accuracy founded. Wait steps reset.")
+                    if sys.argv.debug: print("New best Accuracy founded. Wait steps reset.")
                     best_model_global_step_acc = g
 
                 elif wait_steps_acc < patience:
                     wait_steps_acc += 1
-                    if DEBUG: print("Wait steps Accuracy incremented: {}\n".format(wait_steps_acc))
+                    if sys.argv.debug: print("Wait steps Accuracy incremented: {}\n".format(wait_steps_acc))
 
 
                 if wait_steps_acc >= patience:
@@ -273,7 +285,7 @@ def main_fun(argv, ctx):
                     break
 
                 ################## LOSS ##################
-                if DEBUG:
+                if sys.argv.debug:
                     print("\n[ Early Stop Checking (Loss) ]")
                     print("Best loss = %.10f" %(best_loss))
                     print("Loss after run  =  %.10f" %(loss))
@@ -281,12 +293,12 @@ def main_fun(argv, ctx):
                 if loss < best_loss:
                     best_loss = loss
                     wait_steps_loss = 0
-                    if DEBUG: print("New best loss founded. Wait steps reset.")
+                    if sys.argv.debug: print("New best loss founded. Wait steps reset.")
                     best_model_global_step_loss = g
 
                 elif wait_steps_loss < patience:
                     wait_steps_loss += 1
-                    if DEBUG: print("Wait steps loss incremented: {}\n".format(wait_steps_loss))
+                    if sys.argv.debug: print("Wait steps loss incremented: {}\n".format(wait_steps_loss))
 
 
                 if wait_steps_loss >= patience:

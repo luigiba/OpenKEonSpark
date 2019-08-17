@@ -4,13 +4,15 @@
     <list default="true" id="0f79fb12-bf2b-474d-8da4-e622edb018dd" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Config.py" beforeDir="false" afterPath="$PROJECT_DIR$/Config.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Model.py" beforeDir="false" afterPath="$PROJECT_DIR$/Model.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/TransE.py" beforeDir="false" afterPath="$PROJECT_DIR$/TransE.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/base/Corrupt.h" beforeDir="false" afterPath="$PROJECT_DIR$/base/Corrupt.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/base/Base.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/base/Base.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/base/Reader.h" beforeDir="false" afterPath="$PROJECT_DIR$/base/Reader.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/base/Setting.h" beforeDir="false" afterPath="$PROJECT_DIR$/base/Setting.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/base/Test.h" beforeDir="false" afterPath="$PROJECT_DIR$/base/Test.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/commands.txt" beforeDir="false" afterPath="$PROJECT_DIR$/commands.txt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/distribute_training.py" beforeDir="false" afterPath="$PROJECT_DIR$/distribute_training.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/res_spark/README.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/main_spark.py" beforeDir="false" afterPath="$PROJECT_DIR$/main_spark.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/release/Base.so" beforeDir="false" afterPath="$PROJECT_DIR$/release/Base.so" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/run_dbpedia.sh" beforeDir="false" afterPath="$PROJECT_DIR$/run_dbpedia.sh" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/test.py" beforeDir="false" afterPath="$PROJECT_DIR$/test.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/test_1.py" beforeDir="false" afterPath="$PROJECT_DIR$/test_1.py" afterDir="false" />
@@ -133,5 +135,16 @@
         </entry>
       </map>
     </option>
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/TransE.py</url>
+          <line>1</line>
+          <option name="timeStamp" value="1" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
   </component>
 </project>

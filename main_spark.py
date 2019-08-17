@@ -10,9 +10,6 @@ import traceback
 import time
 from os import path
 
-
-DEBUG = distribute_training.DEBUG
-
 NEW_BATCH_TRIPLES_FILE_NAME = 'batch2id.txt'
 NEW_BATCH_ENTITIES_FILE_NAME = 'batchEntity2id.txt'
 NEW_BATCH_TEST_FILE_NAME = 'batchTest2id.txt'
@@ -23,10 +20,17 @@ TRIPLES_FILE_NAME = 'train2id.txt'
 TEST_FILE_NAME = 'test2id.txt'
 VALID_FILE_NAME = 'valid2id.txt'
 
-ENTITY_EMBEDDING_TENSOR_NAME = 'ent_embeddings'
+#TODO: retrieve these from models methods
+#tensors which depends from entities dimension
+ENTITY_EMBEDDING_TENSOR_NAME = 'ent_embeddings'     #from TransE, TransH, TransR, TransD
+ENTITY_TRANSFER_TENSOR_NAME = 'ent_transfer'        #from TransD
 
 
 def update_entities_and_model():
+    '''
+    Update the tensor variables if new entites are introduced in the new batch
+    '''
+
     n_entities = 0
     n_new_entities = 0
     final_entity_size = 0
@@ -46,7 +50,7 @@ def update_entities_and_model():
         entity_lines = f.readlines()
     n_entities = int(entity_lines[0])
     final_entity_size = n_entities + n_new_entities
-    if DEBUG: print("Number of new entities in batch: " + str(n_new_entities))
+    if sys.argv.debug: print("Number of new entities in batch: " + str(n_new_entities))
 
 
     ######### UPDATE THE MODEL #########
@@ -54,16 +58,16 @@ def update_entities_and_model():
         con, ckpt = distribute_training.get_conf_to_update_model(sys.argv.output_path)
         vars = []
 
-        if DEBUG: print("\nGLOBAL VARS FOUNDED IN CHECKPOINT:\n")
+        if sys.argv.debug: print("\nGLOBAL VARS FOUNDED IN CHECKPOINT:\n")
         with con.graph.as_default():
             with con.sess.as_default():
                 for v in tf.global_variables():
-                    if DEBUG: print(str(v.name) + " " + str(v.shape))
+                    if sys.argv.debug: print(str(v.name) + " " + str(v.shape))
                     vars.append(v)
-        if DEBUG: print('\n')
+        if sys.argv.debug: print('\n')
 
 
-        if DEBUG: print("NEW GLOBAL VARIABLES")
+        if sys.argv.debug: print("NEW GLOBAL VARIABLES")
         graph = tf.Graph()
         with graph.as_default():
             sess = tf.Session()
@@ -71,13 +75,13 @@ def update_entities_and_model():
                 for v in vars:
                     current_name = v.name.split(':')[0]
 
-                    if current_name == ENTITY_EMBEDDING_TENSOR_NAME:
+                    if current_name == ENTITY_EMBEDDING_TENSOR_NAME or current_name == ENTITY_TRANSFER_TENSOR_NAME:
                         tmp = tf.get_variable(name=current_name, shape=[final_entity_size, v.shape[1]], initializer=tf.contrib.layers.xavier_initializer(uniform = False), dtype=v.dtype)
                         sess.run(tf.initialize_variables([tmp]))
                         tmp_value = con.sess.run(v)
                         sess.run(tf.scatter_update(tmp, [i for i in range(0, n_entities)], tmp_value))
 
-                    elif current_name in [ENTITY_EMBEDDING_TENSOR_NAME+'/Adam', ENTITY_EMBEDDING_TENSOR_NAME+'/Adam_1']:
+                    elif current_name in [ENTITY_EMBEDDING_TENSOR_NAME+'/Adam', ENTITY_EMBEDDING_TENSOR_NAME+'/Adam_1', ENTITY_TRANSFER_TENSOR_NAME+'/Adam', ENTITY_TRANSFER_TENSOR_NAME+'/Adam_1']:
                         tmp = tf.get_variable(name=current_name, shape=[final_entity_size, v.shape[1]], initializer=tf.zeros_initializer(), dtype=v.dtype)
                         sess.run(tf.initialize_variables([tmp]))
                         tmp_value = con.sess.run(v)
@@ -103,15 +107,21 @@ def update_entities_and_model():
         #update entities: append the new entities at the end of the file
         entity_lines = entity_lines + batch_entities
 
-        #update entity2id
+        #update entity2id.txt
         with open(sys.argv.input_path+ENTITIES_FILE_NAME, "w") as f:
             f.writelines(entity_lines)
-    if DEBUG: print("Entity file updated")
+    if sys.argv.debug: print("Entity file updated")
 
     return n_new_entities, final_entity_size
 
 
 def update_triples(file_name_to_update, file_name_batch):
+    '''
+    Update file_name_to_update by appending the triples contained in file_name_batch
+    The first line of file_name_to_update (i.e. the number of triples) is updated accordingly
+    :param file_name_to_update:
+    :param file_name_batch:
+    '''
     batch_triples_size = 0
     batch_triples = []
 
@@ -137,23 +147,26 @@ def update_triples(file_name_to_update, file_name_batch):
         #update file
         with open(sys.argv.input_path + file_name_to_update, "w") as f:
             f.writelines(lines)
-    if DEBUG: print("File updated")
+    if sys.argv.debug: print("File updated")
 
 
 def feed_batch():
+    '''
+    Update files containing entities / relations / triples with data contained in new batch
+    '''
     current_time = time.time()
-    if DEBUG: print("New batch file founded")
+    if sys.argv.debug: print("New batch file founded")
     try:
-        if DEBUG: print("Updating "+ENTITIES_FILE_NAME+" and model tensors...")
+        if sys.argv.debug: print("Updating "+ENTITIES_FILE_NAME+" and model tensors...")
         update_entities_and_model()
 
-        if DEBUG: print("Updating "+TRIPLES_FILE_NAME+"...")
+        if sys.argv.debug: print("Updating "+TRIPLES_FILE_NAME+"...")
         update_triples(TRIPLES_FILE_NAME, NEW_BATCH_TRIPLES_FILE_NAME)
 
-        if DEBUG: print("Updating "+TEST_FILE_NAME+"...")
+        if sys.argv.debug: print("Updating "+TEST_FILE_NAME+"...")
         update_triples(TEST_FILE_NAME, NEW_BATCH_TEST_FILE_NAME)
 
-        if DEBUG: print("Updating "+VALID_FILE_NAME+"...")
+        if sys.argv.debug: print("Updating "+VALID_FILE_NAME+"...")
         update_triples(VALID_FILE_NAME, NEW_BATCH_VALID_FILE_NAME)
 
         elapsed_time = time.time() - current_time
@@ -168,6 +181,9 @@ def feed_batch():
 
 
 def is_new_batch():
+    '''
+    Return True if there is a new batch to train
+    '''
     return os.path.isfile(sys.argv.input_path+NEW_BATCH_TRIPLES_FILE_NAME) and \
            os.path.isfile(sys.argv.input_path+NEW_BATCH_ENTITIES_FILE_NAME) and \
             os.path.isfile(sys.argv.input_path+NEW_BATCH_TEST_FILE_NAME) and \
@@ -175,6 +191,9 @@ def is_new_batch():
 
 
 def remove_batch_files():
+    '''
+    Remove 4 batch files
+    '''
     os.remove(sys.argv.input_path+NEW_BATCH_TRIPLES_FILE_NAME)
     os.remove(sys.argv.input_path+NEW_BATCH_ENTITIES_FILE_NAME)
     os.remove(sys.argv.input_path+NEW_BATCH_TEST_FILE_NAME)
@@ -182,6 +201,9 @@ def remove_batch_files():
 
 
 def n_n():
+    '''
+    Generate type constrain file
+    '''
     lef = {}
     rig = {}
     rellef = {}
@@ -262,11 +284,10 @@ def n_n():
 
 
 if __name__ == '__main__':
-    if DEBUG: print("Creating Spark Context...")
+    print("Creating Spark Context...")
     sc = SparkContext(conf=SparkConf().setAppName('OpenKEonSpark'))
 
-
-    if DEBUG: print("Parsing arguments...")
+    print("Parsing arguments...")
     parser = argparse.ArgumentParser()
     parser.add_argument("--cluster_size", help="number of nodes in the cluster", type=int, default=int(sc._conf.get("spark.executor.instances")))
     parser.add_argument("--num_ps", help="number of ps nodes", type=int, default=1)
@@ -289,6 +310,7 @@ if __name__ == '__main__':
     parser.add_argument("--early_stop_stopping_step", help="perfrom early stop each stopping step", type=int, default=1)
     parser.add_argument("--early_stop_start_step", help="perfrom early stop from start step", type=int, default=1)
     parser.add_argument("--model", help="model to be used", type=str, default="TransE")
+    parser.add_argument("--debug", help="if Ture prints additional debug information", type=bool, default=True)
 
 
     (args, remainder) = parser.parse_known_args()
@@ -296,46 +318,47 @@ if __name__ == '__main__':
     print("===== num_executors={}, num_workers={}, num_ps={}".format(args.cluster_size, num_workers, args.num_ps))
 
 
-    if DEBUG: print("Setting batch files if present...")
+    if args.debug: print("Setting batch files if present...")
     sys.argv = args
     if is_new_batch(): feed_batch()
 
 
-    if DEBUG: print("Generating type files...")
+    if args.debug: print("Generating type files...")
     n_n()
 
 
-    if DEBUG: print("Removing stop file...")
+    if args.debug: print("Removing stop file...")
     try:
         os.remove(args.output_path+"/stop.txt")
     except:
         pass
 
 
-    if DEBUG: print("Creating cluster...")
+    if args.debug: print("Creating cluster...")
     training_time = time.time()
+    #perform training on new batch / continute training on old training set
     cluster = TFCluster.run(sc, distribute_training.main_fun, args, args.cluster_size, args.num_ps, True, TFCluster.InputMode.TENSORFLOW)
 
 
 
-    if DEBUG: print("Shutdowning cluster...")
+    if args.debug: print("Shutdowning cluster...")
     cluster.shutdown()
     training_time = time.time() - training_time
 
 
 
-    if DEBUG: print("Removing batch files if present...")
+    if args.debug: print("Removing batch files if present...")
     if is_new_batch(): remove_batch_files()
 
 
 
-    if DEBUG: print("Printing time information on files...")
+    if args.debug: print("Printing time information on files...")
     with open(args.output_path+'/time.txt', 'w') as f:
         f.write("Training time: " + str(training_time) + "\n")
 
 
 
-    if DEBUG: print("Restoring the best model founded during training...")
+    if args.debug: print("Restoring the best model founded during training...")
     if path.exists(args.output_path+"/stop.txt"):
         step = None
         with open(args.output_path+"/stop.txt", "r") as f:
@@ -365,5 +388,5 @@ if __name__ == '__main__':
                     os.remove(args.output_path+"/"+f)
 
 
-    if DEBUG: print("Training finished")
+    if args.debug: print("Training finished")
 

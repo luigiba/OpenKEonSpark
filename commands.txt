@@ -1,8 +1,6 @@
 #commands to run OpenKEonSpark on Google Colaboratory platform
 
 #install
-!sudo apt-get update 
-!sudo apt-get upgrade
 !apt-get install openjdk-8-jdk-headless -qq > /dev/null
 import os
 os.environ["JAVA_HOME"] = "/usr/lib/jvm/java-8-openjdk-amd64"
@@ -15,8 +13,8 @@ os.environ["JAVA_HOME"] = "/usr/lib/jvm/java-8-openjdk-amd64"
 from google.colab import drive
 drive.mount('/content/drive')
 
-#unzip project
-!unzip /content/drive/My\ Drive/DBpedia/OpenKEonSpark.zip
+#clone project
+!git clone https://github.com/luigiba/OpenKEonSpark.git
 !mv OpenKEonSpark/gpu_info.py /usr/local/lib/python3.6/dist-packages/tensorflowonspark/gpu_info.py
 
 #unzip dataset

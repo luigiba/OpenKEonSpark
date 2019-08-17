@@ -100,8 +100,10 @@ void importTrainFiles() {
         trainList_no[i].t = trainList[i].t;
         trainList_no[i].r = trainList[i].r;
 	}
+
 	fclose(fin);
 	std::sort(trainList, trainList + trainTotal, Triple::cmp_head);
+
 
 	tmp = trainTotal;
 	trainTotal = 1;
@@ -109,7 +111,7 @@ void importTrainFiles() {
 	freqEnt[trainList[0].t] += 1;
 	freqEnt[trainList[0].h] += 1;
 	freqRel[trainList[0].r] += 1;
-	for (INT i = 1; i < tmp; i++)
+	for (INT i = 1; i < tmp; i++){
 		if (trainList[i].h != trainList[i - 1].h ||
 		    trainList[i].r != trainList[i - 1].r ||
 		    trainList[i].t != trainList[i - 1].t) {
@@ -120,6 +122,7 @@ void importTrainFiles() {
 			freqEnt[trainList[i].h]++;
 			freqRel[trainList[i].r]++;
 		}
+    }
 
 	std::sort(trainHead, trainHead + trainTotal, Triple::cmp_head);
 	std::sort(trainTail, trainTail + trainTotal, Triple::cmp_tail);
@@ -174,6 +177,7 @@ void importTrainFiles() {
 		left_mean[i] = freqRel[i] / left_mean[i];
 		right_mean[i] = freqRel[i] / right_mean[i];
 	}
+
 }
 
 Triple *testList;

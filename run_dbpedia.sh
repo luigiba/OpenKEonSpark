@@ -5,7 +5,7 @@ echo "$3"
 echo "$4"
 
 echo "====================================== Clearning res_spark directory ======================================"
-rm /home/luigi/IdeaProjects/OpenKE_new_Spark/res_spark/*
+rm $WORK_DIR_PREFIX/res_spark/*
 
 echo "====================================== Stopping Spark Master & slaves ======================================"
 $SPARK_HOME/sbin/stop-slave.sh
@@ -28,6 +28,15 @@ do
   if [ -f /content/drive/My\ Drive/DBpedia/$n/$i/res.txt ]; then
     echo "Batch $i already done; Skipping batch $i"
 	  continue
+  fi
+
+  if [ -f /content/drive/My\ Drive/DBpedia/$n/$i/model/checkpoint ]; then
+    echo "====================================== Test for batch $i ======================================"
+    if [ $i -eq $m ]; then
+	    python3 $WORK_DIR_PREFIX/test.py $i $n $2 $3 1 | tee /content/drive/My\ Drive/DBpedia/$n/$i/res.txt
+    else
+      python3 $WORK_DIR_PREFIX/test.py $i $n $2 $3 0 | tee /content/drive/My\ Drive/DBpedia/$n/$i/res.txt
+    fi
   fi
 
 

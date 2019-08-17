@@ -40,11 +40,9 @@ INT getTestTotal();
 extern "C"
 INT getValidTotal();
 
-//EDIT
 extern "C"
 INT getTrainTotal_();
 
-//EDIT
 extern "C"
 INT getBatchTotal();
 
@@ -54,7 +52,6 @@ void randReset();
 extern "C"
 void importTrainFiles();
 
-//EDIT
 extern "C"
 void importOntologyFiles();
 
@@ -95,7 +92,6 @@ void* getBatch(void* con) {
 		INT i;
 
 		/**
-		* EDIT
 		* select batch triple / train triple
 		**/
 		if (newBatchTotal > 0){
@@ -105,7 +101,7 @@ void* getBatch(void* con) {
             i = rand_max(id, trainTotal_);
         }
 
-        //EDIT changed trainList to trainList_no
+
 		batch_h[batch] = trainList_no[i].h;
         batch_t[batch] = trainList_no[i].t;
         batch_r[batch] = trainList_no[i].r;

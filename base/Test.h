@@ -34,11 +34,21 @@ INT* testHead(INT index, REAL *con) {
     INT r = testList[index].r;
     REAL minimal = con[h];
 
-    INT* l_arr = new INT[4];
+    INT* l_arr = new INT[8];
     INT l_s = 0;
     INT l_filter_s = 0;
     INT l_s_constrain = 0;
     INT l_filter_s_constrain = 0;
+
+    INT l_min = h;
+    INT l_filter_min = h;
+    INT l_constrain_min = h;
+    INT l_filter_constrain_min = h;
+
+    REAL l_min_s = minimal;
+    REAL l_filter_min_s = minimal;
+    REAL l_constrain_min_s = minimal;
+    REAL l_filter_constrain_min_s = minimal;
 
     INT lef = 0;
     INT rig = 0;
@@ -51,8 +61,17 @@ INT* testHead(INT index, REAL *con) {
             REAL value = con[j];
             if (value < minimal) {
                 l_s += 1;
+                if (value < l_min_s){
+                    l_min_s = value;
+                    l_min = j;
+                }
+
                 if (not _find(j, t, r))
                     l_filter_s += 1;
+                    if (value < l_filter_min_s){
+                        l_filter_min_s = value;
+                        l_filter_min = j;
+                    }
             }
 
             //TYPE_C
@@ -60,8 +79,17 @@ INT* testHead(INT index, REAL *con) {
             if (lef < rig && j == head_type[lef]) {
                 if (value < minimal) {
                     l_s_constrain += 1;
+                    if (value < l_constrain_min_s){
+                        l_constrain_min_s = value;
+                        l_constrain_min = j;
+                    }
+
                     if (not _find(j, t, r)) {
                         l_filter_s_constrain += 1;
+                        if (value < l_filter_constrain_min_s){
+                            l_filter_constrain_min_s = value;
+                            l_filter_constrain_min = j;
+                        }
                     }
                 }
             }
@@ -72,6 +100,36 @@ INT* testHead(INT index, REAL *con) {
     l_arr[1] = l_filter_s;
     l_arr[2] = l_s_constrain;
     l_arr[3] = l_filter_s_constrain;
+
+    l_arr[4] = l_min;
+    l_arr[5] = l_filter_min;
+    l_arr[6] = l_constrain_min;
+    l_arr[7] = l_filter_constrain_min;
+
+    INT lef_sup = sup_lef[h];
+    INT rig_sup = sup_rig[h];
+    INT lef_sub = sub_lef[h];
+    INT rig_sub = sub_rig[h];
+    for(INT i = 4; i < 8; i++){
+        if (l_arr[i] == h){                                                         //it's ok
+            l_arr[i] = 0;
+            continue;
+        }
+
+        while (lef_sup < rig_sup && sup_type[lef_sup] < l_arr[i]) lef_sup ++;       //generalization error
+        if (lef_sup < rig_sup && l_arr[i] == sup_type[lef_sup]){
+            l_arr[i] = 1;
+            continue;
+        }
+
+        while (lef_sub < rig_sub && sub_type[lef_sub] < l_arr[i]) lef_sub ++;       //specialization error
+        if (lef_sub < rig_sub && l_arr[i] == sub_type[lef_sub]){
+            l_arr[i] = 2;
+            continue;
+        }
+
+        l_arr[i] = 3;                                                               //misclassification error
+    }
 
     return l_arr;
 
@@ -112,7 +170,6 @@ INT* testTail(INT index, REAL *con) {
             REAL value = con[j];
             if (value < minimal) {
                 r_s += 1;
-
                 if (value < r_min_s){
                     r_min_s = value;
                     r_min = j;
@@ -120,7 +177,6 @@ INT* testTail(INT index, REAL *con) {
 
                 if (not _find(h, j, r)){
                     r_filter_s += 1;
-
                     if (value < r_filter_min_s){
                         r_filter_min_s = value;
                         r_filter_min = j;
@@ -134,7 +190,6 @@ INT* testTail(INT index, REAL *con) {
             if (lef < rig && j == tail_type[lef]) {
                     if (value < minimal) {
                         r_s_constrain += 1;
-
                         if (value < r_constrain_min_s){
                             r_constrain_min_s = value;
                             r_constrain_min = j;
@@ -143,7 +198,6 @@ INT* testTail(INT index, REAL *con) {
 
                         if (not _find(h, j ,r)) {
                             r_filter_s_constrain += 1;
-
                             if (value < r_filter_constrain_min_s){
                                 r_filter_constrain_min_s = value;
                                 r_filter_constrain_min = j;
