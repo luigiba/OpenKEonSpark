@@ -37,7 +37,6 @@ class Config(object):
             self.lib.getHeadBatch.argtypes = [ctypes.c_int64, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
             self.lib.testHead.argtypes = [ctypes.c_int64, ctypes.c_void_p]
             self.lib.testHead.restype = ctypes.POINTER(ctypes.c_int64 * 8)
-            self.test_head = 0
 
             #triple classification
             self.lib.getTestBatch.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
@@ -53,7 +52,6 @@ class Config(object):
 
             #set other parameters
             self.in_path = None
-            self.test_log_path = None
             self.out_path = None
             self.bern = 0
             self.hidden_size = 64
@@ -80,9 +78,6 @@ class Config(object):
         self.lib.importTestFiles()
         self.lib.importTypeFiles()
         self.lib.importOntologyFiles()
-        self.N_THREADS_LP = 10
-        self.lp_res = []
-        for _ in range(self.N_THREADS_LP): self.lp_res.append({})
 
 
     def init_triple_classification(self):
@@ -190,14 +185,6 @@ class Config(object):
             if self.valid_triple_classification:
                 self.init_valid_triple_classification()
 
-    def set_n_threads_LP(self, n):
-        '''
-        Set the number of threads used during Link prediction evaluation
-        :param n: the number of threads
-        '''
-        self.N_THREADS_LP = n
-        self.lp_res = []
-        for _ in range(self.N_THREADS_LP): self.lp_res.append({})
 
     def set_mini_batch(self):
         '''
@@ -222,14 +209,6 @@ class Config(object):
         print("Batch size is {}".format(self.batch_size))
         print("Number of batches: {}".format(self.nbatches))
 
-
-    def set_test_log_path(self, p):
-        '''
-        Set test log path used from link prediction to store checkpoint file
-        If the link prediction evaluation task is interrupted, the evaluation will restart from last checkpoint
-        :param p: absolute path
-        '''
-        self.test_log_path = p
 
     def get_ent_total(self):
         '''
@@ -295,13 +274,6 @@ class Config(object):
         '''
         self.bern = bern
 
-    def set_test_head(self, test_head):
-        '''
-        Set whether to test link prediction on triple head, too
-        By default the link prediction evaluation will be performed only on tail
-        :param test_head: 1 for True, 0 for False
-        '''
-        self.test_head = test_head
 
     def set_dimension(self, dim):
         '''
@@ -516,214 +488,6 @@ class Config(object):
         return predict
 
 
-    def test_lp_range(self, index, lef, rig):
-        '''
-        This method is used to parallelize link prediction evaluation task among different threads
-        Each thread will perform link prediction evaluation from the lef-th test triple and the rig-th test triple
-        Each thread will save checkpoints from which to restore the task in case of interruption
-        :param index: thread index
-        :param lef: test triple id left limit
-        :param rig: test triple id right limit
-        '''
-        #init tail variables
-        current_lp_res = {
-            'r_tot' : 0.0, 'r_filter_tot' : 0.0, 'r_tot_constrain' : 0.0, 'r_filter_tot_constrain' : 0.0,
-            'r1_tot' : 0.0, 'r1_filter_tot' : 0.0, 'r1_tot_constrain' : 0.0, 'r1_filter_tot_constrain' : 0.0,
-            'r3_tot' : 0.0, 'r3_filter_tot' : 0.0,  'r3_tot_constrain' : 0.0, 'r3_filter_tot_constrain' : 0.0,
-            'r_rank' : 0.0, 'r_filter_rank' : 0.0, 'r_rank_constrain' : 0.0, 'r_filter_rank_constrain' : 0.0,
-            'r_reci_rank' : 0.0,'r_filter_reci_rank' : 0.0, 'r_reci_rank_constrain' : 0.0, 'r_filter_reci_rank_constrain' : 0.0,
-            'r_mis_err' : 0.0, 'r_spec_err' : 0.0, 'r_gen_err' : 0.0,
-            'r_filter_mis_err' : 0.0, 'r_filter_spec_err' : 0.0, 'r_filter_gen_err' : 0.0,
-            'r_mis_err_constrain' : 0.0, 'r_spec_err_constrain' : 0.0, 'r_gen_err_constrain' : 0.0,
-            'r_filter_mis_err_constrain' : 0.0, 'r_filter_spec_err_constrain' : 0.0, 'r_filter_gen_err_constrain' : 0.0
-        }
-
-        if self.test_head != 0:
-            #init head variable
-            current_lp_res['l_tot'] = 0.0
-            current_lp_res['l_filter_tot'] = 0.0
-            current_lp_res['l_tot_constrain'] = 0.0
-            current_lp_res['l_filter_tot_constrain'] = 0.0
-            current_lp_res['l1_tot'] = 0.0
-            current_lp_res['l1_filter_tot'] = 0.0
-            current_lp_res['l1_tot_constrain'] = 0.0
-            current_lp_res['l1_filter_tot_constrain'] = 0.0
-            current_lp_res['l3_tot'] = 0.0
-            current_lp_res['l3_filter_tot'] = 0.0
-            current_lp_res['l3_tot_constrain'] = 0.0
-            current_lp_res['l3_filter_tot_constrain'] = 0.0
-            current_lp_res['l_rank'] = 0.0
-            current_lp_res['l_filter_rank'] = 0.0
-            current_lp_res['l_rank_constrain'] = 0.0
-            current_lp_res['l_filter_rank_constrain'] = 0.0
-            current_lp_res['l_reci_rank'] = 0.0
-            current_lp_res['l_filter_reci_rank'] = 0.0
-            current_lp_res['l_reci_rank_constrain'] = 0.0
-            current_lp_res['l_filter_reci_rank_constrain'] = 0.0
-            current_lp_res['l_mis_err'] = 0.0
-            current_lp_res['l_spec_err'] = 0.0
-            current_lp_res['l_gen_err'] = 0.0
-            current_lp_res['l_filter_mis_err'] = 0.0
-            current_lp_res['l_filter_spec_err'] = 0.0
-            current_lp_res['l_filter_gen_err'] = 0.0
-            current_lp_res['l_mis_err_constrain'] = 0.0
-            current_lp_res['l_spec_err_constrain'] = 0.0
-            current_lp_res['l_gen_err_constrain'] = 0.0
-            current_lp_res['l_filter_mis_err_constrain'] = 0.0
-            current_lp_res['l_filter_spec_err_constrain'] = 0.0
-            current_lp_res['l_filter_gen_err_constrain'] = 0.0
-
-        #init test arrays
-        test_h = np.zeros(self.lib.getEntityTotal(), dtype = np.int64)
-        test_t = np.zeros(self.lib.getEntityTotal(), dtype = np.int64)
-        test_r = np.zeros(self.lib.getEntityTotal(), dtype = np.int64)
-        test_h_addr = test_h.__array_interface__['data'][0]
-        test_t_addr = test_t.__array_interface__['data'][0]
-        test_r_addr = test_r.__array_interface__['data'][0]
-
-        print("Test link prediction range from {} to {}".format(lef, rig-1))
-
-        #restore from last checkpoint (if founded)
-        if os.path.exists(self.test_log_path+"thread"+str(index)):
-            with open(self.test_log_path+"thread"+str(index), 'r') as f:
-                last_i = int(f.readline())
-                print("Restoring test results from index {}".format(last_i))
-                lef = last_i + 1
-                for key in current_lp_res.keys():
-                    current_lp_res[key] = float(f.readline())
-
-        test_triples_done = 0
-        for i in range(lef, rig):
-            #tail link prediction on i-th test triple
-            self.lib.getTailBatch(i, test_h_addr, test_t_addr, test_r_addr)
-            res = self.test_step(test_h, test_t, test_r)
-            test_tail_res = [j for j in self.lib.testTail(i, res.__array_interface__['data'][0]).contents]
-
-            r_s = test_tail_res[0]
-            r_filter_s = test_tail_res[1]
-            r_s_constrain = test_tail_res[2]
-            r_filter_s_constrain = test_tail_res[3]
-            r_min = test_tail_res[4]
-            r_filter_min = test_tail_res[5]
-            r_constrain_min = test_tail_res[6]
-            r_filter_constrain_min = test_tail_res[7]
-
-            #hits
-            if (r_filter_s < 10): current_lp_res['r_filter_tot'] += 1
-            if (r_s < 10): current_lp_res['r_tot'] += 1
-            if (r_filter_s < 3): current_lp_res['r3_filter_tot'] += 1
-            if (r_s < 3): current_lp_res['r3_tot'] += 1
-
-            if (r_filter_s_constrain < 10): current_lp_res['r_filter_tot_constrain'] += 1
-            if (r_s_constrain < 10): current_lp_res['r_tot_constrain'] += 1
-            if (r_filter_s_constrain < 3): current_lp_res['r3_filter_tot_constrain'] += 1
-            if (r_s_constrain < 3): current_lp_res['r3_tot_constrain'] += 1
-
-            #ontology
-            if (r_filter_s < 1): current_lp_res['r1_filter_tot'] += 1
-            elif (r_filter_min == 1): current_lp_res['r_filter_gen_err'] += 1
-            elif (r_filter_min == 2): current_lp_res['r_filter_spec_err'] += 1
-            else: current_lp_res['r_filter_mis_err'] += 1
-
-            if (r_s < 1): current_lp_res['r1_tot'] += 1
-            elif (r_min == 1): current_lp_res['r_gen_err'] += 1
-            elif (r_min == 2): current_lp_res['r_spec_err'] += 1
-            else: current_lp_res['r_mis_err'] += 1
-
-            if (r_filter_s_constrain < 1): current_lp_res['r1_filter_tot_constrain'] += 1
-            elif (r_filter_constrain_min == 1): current_lp_res['r_filter_gen_err_constrain'] += 1
-            elif (r_filter_constrain_min == 2): current_lp_res['r_filter_spec_err_constrain'] += 1
-            else: current_lp_res['r_filter_mis_err_constrain'] += 1
-
-            if (r_s_constrain < 1): current_lp_res['r1_tot_constrain'] += 1
-            elif (r_constrain_min == 1): current_lp_res['r_gen_err_constrain'] += 1
-            elif (r_constrain_min == 2): current_lp_res['r_spec_err_constrain'] += 1
-            else: current_lp_res['r_mis_err_constrain'] += 1
-
-            #MR
-            current_lp_res['r_filter_rank'] += (1+r_filter_s)
-            current_lp_res['r_rank'] += (1+r_s)
-            current_lp_res['r_filter_reci_rank'] += np.divide(1.0, (1+r_filter_s))
-            current_lp_res['r_reci_rank'] += np.divide(1.0, (1+r_s))
-
-            current_lp_res['r_filter_rank_constrain'] += (1+r_filter_s_constrain)
-            current_lp_res['r_rank_constrain'] += (1+r_s_constrain)
-            current_lp_res['r_filter_reci_rank_constrain'] += np.divide(1.0, (1+r_filter_s_constrain))
-            current_lp_res['r_reci_rank_constrain'] += np.divide(1.0, (1+r_s_constrain))
-
-
-            if self.test_head != 0:
-                #head link prediction on i-th test triple
-                self.lib.getHeadBatch(i, test_h_addr, test_t_addr, test_r_addr)
-                res = self.test_step(test_h, test_t, test_r)
-                test_head_res = [j for j in self.lib.testHead(i, res.__array_interface__['data'][0]).contents]
-
-                l_s = test_head_res[0]
-                l_filter_s = test_head_res[1]
-                l_s_constrain = test_head_res[2]
-                l_filter_s_constrain = test_head_res[3]
-                l_min = test_head_res[4]
-                l_filter_min = test_head_res[5]
-                l_constrain_min = test_head_res[6]
-                l_filter_constrain_min = test_head_res[7]
-
-                #hits
-                if (l_filter_s < 10): current_lp_res['l_filter_tot'] += 1
-                if (l_s < 10): current_lp_res['l_tot'] += 1
-                if (l_filter_s < 3): current_lp_res['l3_filter_tot'] += 1
-                if (l_s < 3): current_lp_res['l3_tot'] += 1
-
-                if (l_filter_s_constrain < 10): current_lp_res['l_filter_tot_constrain'] += 1
-                if (l_s_constrain < 10): current_lp_res['l_tot_constrain'] += 1
-                if (l_filter_s_constrain < 3): current_lp_res['l3_filter_tot_constrain'] += 1
-                if (l_s_constrain < 3): current_lp_res['l3_tot_constrain'] += 1
-
-                #ontology
-                if (l_filter_s < 1): current_lp_res['l1_filter_tot'] += 1
-                elif (l_filter_min == 1): current_lp_res['l_filter_gen_err'] += 1
-                elif (l_filter_min == 2): current_lp_res['l_filter_spec_err'] += 1
-                else: current_lp_res['l_filter_mis_err'] += 1
-
-                if (l_s < 1): current_lp_res['l1_tot'] += 1
-                elif (l_min == 1): current_lp_res['l_gen_err'] += 1
-                elif (l_min == 2): current_lp_res['l_spec_err'] += 1
-                else: current_lp_res['l_mis_err'] += 1
-
-                if (l_filter_s_constrain < 1): current_lp_res['l1_filter_tot_constrain'] += 1
-                elif (l_filter_constrain_min == 1): current_lp_res['l_filter_gen_err_constrain'] += 1
-                elif (l_filter_constrain_min == 2): current_lp_res['l_filter_spec_err_constrain'] += 1
-                else: current_lp_res['l_filter_mis_err_constrain'] += 1
-
-                if (l_s_constrain < 1): current_lp_res['l1_tot_constrain'] += 1
-                elif (l_constrain_min == 1): current_lp_res['l_gen_err_constrain'] += 1
-                elif (l_constrain_min == 2): current_lp_res['l_spec_err_constrain'] += 1
-                else: current_lp_res['l_mis_err_constrain'] += 1
-
-                #MR
-                current_lp_res['l_filter_rank'] += (l_filter_s+1)
-                current_lp_res['l_rank'] += (1+l_s)
-                current_lp_res['l_filter_reci_rank'] += np.divide(1.0, (l_filter_s+1))
-                current_lp_res['l_reci_rank'] += np.divide(1.0, (l_s+1))
-
-                current_lp_res['l_filter_rank_constrain'] += (l_filter_s_constrain+1)
-                current_lp_res['l_rank_constrain'] += (1+l_s_constrain)
-                current_lp_res['l_filter_reci_rank_constrain'] += np.divide(1.0, (l_filter_s_constrain+1))
-                current_lp_res['l_reci_rank_constrain'] += np.divide(1.0, (l_s_constrain+1))
-
-
-            if index == 0: sys.stdout.write("\r# of test triples processed: {}".format(i * self.N_THREADS_LP))
-            test_triples_done += 1
-            #save checkpoint
-            if test_triples_done % 100 == 0:
-                with open(self.test_log_path+"thread"+str(index), "w") as f:
-                    f.write(str(i)+'\n')
-                    for key in current_lp_res.keys():
-                        f.write(str(current_lp_res[key])+'\n')
-
-        #share results
-        self.lp_res[index] = current_lp_res
-
-
     def test(self):
         '''
         Perform triple classifcation and link prediction evaluation
@@ -735,111 +499,6 @@ class Config(object):
 
                 test_time_start = time.time()
 
-                if self.test_link_prediction:
-                    #set link prediction on tail variables
-                    d = {
-                        'r_tot' : 0.0, 'r_filter_tot' : 0.0, 'r_tot_constrain' : 0.0, 'r_filter_tot_constrain' : 0.0,
-                        'r1_tot' : 0.0, 'r1_filter_tot' : 0.0, 'r1_tot_constrain' : 0.0, 'r1_filter_tot_constrain' : 0.0,
-                        'r3_tot' : 0.0, 'r3_filter_tot' : 0.0,  'r3_tot_constrain' : 0.0, 'r3_filter_tot_constrain' : 0.0,
-                        'r_rank' : 0.0, 'r_filter_rank' : 0.0, 'r_rank_constrain' : 0.0, 'r_filter_rank_constrain' : 0.0,
-                        'r_reci_rank' : 0.0,'r_filter_reci_rank' : 0.0, 'r_reci_rank_constrain' : 0.0, 'r_filter_reci_rank_constrain' : 0.0,
-                        'r_mis_err' : 0.0, 'r_spec_err' : 0.0, 'r_gen_err' : 0.0,
-                        'r_filter_mis_err' : 0.0, 'r_filter_spec_err' : 0.0, 'r_filter_gen_err' : 0.0,
-                        'r_mis_err_constrain' : 0.0, 'r_spec_err_constrain' : 0.0, 'r_gen_err_constrain' : 0.0,
-                        'r_filter_mis_err_constrain' : 0.0, 'r_filter_spec_err_constrain' : 0.0, 'r_filter_gen_err_constrain' : 0.0
-                    }
-
-                    if self.test_head != 0:
-                        #set link prediction on head variables
-                        d['l_tot'] = 0.0
-                        d['l_filter_tot'] = 0.0
-                        d['l_tot_constrain'] = 0.0
-                        d['l_filter_tot_constrain'] = 0.0
-                        d['l1_tot'] = 0.0
-                        d['l1_filter_tot'] = 0.0
-                        d['l1_tot_constrain'] = 0.0
-                        d['l1_filter_tot_constrain'] = 0.0
-                        d['l3_tot'] = 0.0
-                        d['l3_filter_tot'] = 0.0
-                        d['l3_tot_constrain'] = 0.0
-                        d['l3_filter_tot_constrain'] = 0.0
-                        d['l_rank'] = 0.0
-                        d['l_filter_rank'] = 0.0
-                        d['l_rank_constrain'] = 0.0
-                        d['l_filter_rank_constrain'] = 0.0
-                        d['l_reci_rank'] = 0.0
-                        d['l_filter_reci_rank'] = 0.0
-                        d['l_reci_rank_constrain'] = 0.0
-                        d['l_filter_reci_rank_constrain'] = 0.0
-                        d['l_mis_err'] = 0.0
-                        d['l_spec_err'] = 0.0
-                        d['l_gen_err'] = 0.0
-                        d['l_filter_mis_err'] = 0.0
-                        d['l_filter_spec_err'] = 0.0
-                        d['l_filter_gen_err'] = 0.0
-                        d['l_mis_err_constrain'] = 0.0
-                        d['l_spec_err_constrain'] = 0.0
-                        d['l_gen_err_constrain'] = 0.0
-                        d['l_filter_mis_err_constrain'] = 0.0
-                        d['l_filter_spec_err_constrain'] = 0.0
-                        d['l_filter_gen_err_constrain'] = 0.0
-
-                    testTotal = self.lib.getTestTotal()
-                    triples_per_thread = int(testTotal / self.N_THREADS_LP)
-                    print("Number of test triples: {} Number of triples per test thread: {}".format(testTotal, triples_per_thread))
-                    threads_array = []
-
-                    #parallelize link prediction evaluation to speedup the work
-                    lef = 0
-                    rig = 0
-                    for j in range(self.N_THREADS_LP):
-                        if j+1 == self.N_THREADS_LP:
-                            rig = testTotal
-                        else:
-                            rig += triples_per_thread
-                        threads_array.append(threading.Thread(target=self.test_lp_range, args=(j, lef, rig, )))
-                        lef = rig
-                    for t in threads_array:
-                        t.start()
-                    for t in threads_array:
-                        t.join()
-
-                    #get results from threds
-                    for res in self.lp_res:
-                        for key in res.keys():
-                            d[key] += res[key]
-                    for key in d.keys():
-                        d[key] = np.divide(d[key], testTotal)
-
-                    #print link prediction evaluation results
-                    print("\n ========== LINK PREDICTION RESULTS ==========\nNo type constraint results:")
-                    print("{:<20}{:<20}{:<20}{:<20}{:<20}{:<20}{:<20}{:<20}{:<20}".format("metric", "MRR", "MR", "hit@10", "hit@3", "hit@1", "hit@1GenError", "hit@1SpecError", "hit@1MisError"))
-                    if self.test_head != 0: print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}".format("l(raw):",d['l_reci_rank'], d['l_rank'], d['l_tot'], d['l3_tot'], d['l1_tot'], d['l_gen_err'], d['l_spec_err'], d['l_mis_err']))
-                    print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}".format("r(raw):", d['r_reci_rank'], d['r_rank'], d['r_tot'], d['r3_tot'], d['r1_tot'], d['r_gen_err'], d['r_spec_err'], d['r_mis_err']))
-                    if self.test_head != 0: print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}\n".format("mean(raw):", np.divide((d['l_reci_rank']+d['r_reci_rank']),2), np.divide((d['l_rank']+d['r_rank']),2), np.divide((d['l_tot']+d['r_tot']),2), np.divide((d['l3_tot']+d['r3_tot']),2), np.divide((d['l1_tot']+d['r1_tot']),2), np.divide((d['l_gen_err']+d['r_gen_err']),2), np.divide((d['l_spec_err']+d['r_spec_err']),2), np.divide((d['l_mis_err']+d['r_mis_err']),2)))
-
-                    if self.test_head != 0: print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}".format("l(filter):", d['l_filter_reci_rank'], d['l_filter_rank'], d['l_filter_tot'], d['l3_filter_tot'], d['l1_filter_tot'], d['l_filter_gen_err'], d['l_filter_spec_err'], d['l_filter_mis_err']))
-                    print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}".format('r(filter):', d['r_filter_reci_rank'], d['r_filter_rank'], d['r_filter_tot'], d['r3_filter_tot'], d['r1_filter_tot'], d['r_filter_gen_err'], d['r_filter_spec_err'], d['r_filter_mis_err']))
-                    if self.test_head != 0: print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}\n".format('mean(filter):', np.divide((d['l_filter_reci_rank']+d['r_filter_reci_rank']),2), np.divide((d['l_filter_rank']+d['r_filter_rank']),2), np.divide((d['l_filter_tot']+d['r_filter_tot']),2), np.divide((d['l3_filter_tot']+d['r3_filter_tot']),2), np.divide((d['l1_filter_tot']+d['r1_filter_tot']),2), np.divide((d['l_filter_gen_err']+d['r_filter_gen_err']),2), np.divide((d['l_filter_spec_err']+d['r_filter_spec_err']),2), np.divide((d['l_filter_mis_err']+d['r_filter_mis_err']),2)))
-
-                    print("Type constraint results:")
-                    print("{:<20}{:<20}{:<20}{:<20}{:<20}{:<20}{:<20}{:<20}{:<20}".format("metric", "MRR", "MR", "hit@10", "hit@3", "hit@1", "hit@1GenError", "hit@1SpecError", "hit@1MisError"))
-                    if self.test_head != 0: print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}".format('l(raw):', d['l_reci_rank_constrain'], d['l_rank_constrain'], d['l_tot_constrain'], d['l3_tot_constrain'], d['l1_tot_constrain'], d['l_gen_err_constrain'], d['l_spec_err_constrain'], d['l_mis_err_constrain']))
-                    print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}".format('r(raw):', d['r_reci_rank_constrain'], d['r_rank_constrain'], d['r_tot_constrain'], d['r3_tot_constrain'], d['r1_tot_constrain'], d['r_gen_err_constrain'], d['r_spec_err_constrain'], d['r_mis_err_constrain']))
-                    if self.test_head != 0: print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}\n".format('mean(raw):', np.divide((d['l_reci_rank_constrain']+d['r_reci_rank_constrain']),2), np.divide((d['l_rank_constrain']+d['r_rank_constrain']),2), np.divide((d['l_tot_constrain']+d['r_tot_constrain']),2), np.divide((d['l3_tot_constrain']+d['r3_tot_constrain']),2), np.divide((d['l1_tot_constrain']+d['r1_tot_constrain']),2), np.divide((d['l_gen_err_constrain']+d['r_gen_err_constrain']),2), np.divide((d['l_spec_err_constrain']+d['r_spec_err_constrain']),2), np.divide((d['l_mis_err_constrain']+d['r_mis_err_constrain']),2)))
-
-                    if self.test_head != 0: print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}".format('l(filter):', d['l_filter_reci_rank_constrain'], d['l_filter_rank_constrain'], d['l_filter_tot_constrain'], d['l3_filter_tot_constrain'], d['l1_filter_tot_constrain'], d['l_filter_gen_err_constrain'], d['l_filter_spec_err_constrain'], d['l_filter_mis_err_constrain']))
-                    print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}".format('r(filter):', d['r_filter_reci_rank_constrain'], d['r_filter_rank_constrain'], d['r_filter_tot_constrain'], d['r3_filter_tot_constrain'], d['r1_filter_tot_constrain'], d['r_filter_gen_err_constrain'], d['r_filter_spec_err_constrain'], d['r_filter_mis_err_constrain']))
-                    if self.test_head != 0: print("{:<20}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}{:<20.5f}\n".format('mean(filter):', np.divide((d['l_filter_reci_rank_constrain']+d['r_filter_reci_rank_constrain']),2), np.divide((d['l_filter_rank_constrain']+d['r_filter_rank_constrain']),2), np.divide((d['l_filter_tot_constrain']+d['r_filter_tot_constrain']),2), np.divide((d['l3_filter_tot_constrain']+d['r3_filter_tot_constrain']),2), np.divide((d['l1_filter_tot_constrain']+d['r1_filter_tot_constrain']),2), np.divide((d['l_filter_gen_err_constrain']+d['r_filter_gen_err_constrain']),2), np.divide((d['l_filter_spec_err_constrain']+d['r_filter_spec_err_constrain']),2), np.divide((d['l_filter_mis_err_constrain']+d['r_filter_mis_err_constrain']),2)))
-
-                    #remove checkpoint generated from threads
-                    print()
-                    for index in range(0, self.N_THREADS_LP):
-                        try: os.remove(self.test_log_path+"thread"+str(index))
-                        except: print(" LOG:\tFile " + self.test_log_path+"thread"+str(index) + " not founded")
-                    print()
-
-                #perform triple classification evaluation
                 if self.test_triple_classification:
                     self.lib.getValidBatch(self.valid_pos_h_addr, self.valid_pos_t_addr, self.valid_pos_r_addr, self.valid_neg_h_addr, self.valid_neg_t_addr, self.valid_neg_r_addr)
                     res_pos = self.test_step(self.valid_pos_h, self.valid_pos_t, self.valid_pos_r)
@@ -852,8 +511,6 @@ class Config(object):
                     res_neg = self.test_step(self.test_neg_h, self.test_neg_t, self.test_neg_r)
 
                     self.lib.test_triple_classification(self.relThresh_addr, res_pos.__array_interface__['data'][0], res_neg.__array_interface__['data'][0], self.acc_addr)
-
-
 
                 test_time_elapsed = time.time() - test_time_start
                 print("\nElapsed test time (seconds): {}".format(test_time_elapsed))
