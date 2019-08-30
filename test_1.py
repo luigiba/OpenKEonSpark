@@ -4,8 +4,8 @@ from TransH import TransH
 from TransD import TransD
 from TransR import TransR
 import sys
-# import os
-# os.environ["CUDA_VISIBLE_DEVICES"]="-1"
+
+
 
 def get_ckpt(p):
     ckpt = None
@@ -17,7 +17,8 @@ def get_ckpt(p):
 
 
 #/home/luigi/IdeaProjects/OpenKE_new_Spark/benchmarks/DBpedia
-dataset_path = '/home/luigi/files/stuff/DBpedia/5/0/'
+# dataset_path = '/content/drive/My Drive/DBpedia/1/0/'
+dataset_path = '/home/luigi/files/stuff/DBpedia/5/1/'
 # dataset_path = '/home/luigi/files/stuff/superuser/9/1/'
 path = dataset_path + 'model/'
 # path = '/home/luigi/IdeaProjects/OpenKEonSpark/res_spark/'
@@ -25,20 +26,18 @@ print(path)
 ckpt = get_ckpt(path)
 
 
+# con = Config(cpp_lib_path='/content/OpenKEonSpark/release/Base.so')
 con = Config()
 con.set_in_path(dataset_path)
-con.set_test_link_prediction(True)
-con.set_test_triple_classification(True)
+# con.set_test_link_prediction(True)
+# con.set_test_triple_classification(True)
 con.set_dimension(int(64))
 con.init()
-con.set_model_and_session(TransD)
+con.set_model_and_session(TransE)
 con.set_import_files(path+ckpt)
-con.set_test_log_path(path)
-con.set_n_threads_LP(5)
-con.test()
+# con.set_test_log_path(path)
+# con.set_n_threads_LP(1)
+# con.test()
+con.plot_roc(5)
 
-con.predict_tail_entity(349585, 5, 10)
-# for i in range(0,100):
-#     con.predict_tail_entity(i,0,1)
-# print(con.acc)
 

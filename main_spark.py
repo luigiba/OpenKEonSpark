@@ -342,7 +342,7 @@ if __name__ == '__main__':
 
 
     if args.debug: print("Shutdowning cluster...")
-    cluster.shutdown()
+    cluster.shutdown(timeout=-1)
     training_time = time.time() - training_time
 
 

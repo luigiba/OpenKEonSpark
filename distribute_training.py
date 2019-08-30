@@ -172,7 +172,7 @@ def main_fun(argv, ctx):
 
         if sys.argv.debug: print("Creating Hooks, Scaffold, FileWriter, ConfigProto...")
         iterations = con.train_times * con.nbatches + last_global_step
-        hooks=[tf.train.StopAtStepHook(last_step=iterations)]
+        # hooks=[tf.train.StopAtStepHook(last_step=iterations)]
         scaffold = tf.train.Scaffold(init_op=init_op, saver=saver, summary_op=summary_op)
         tf.summary.FileWriter("tensorboard_%d" % ctx.worker_num, graph=tf.get_default_graph())
         config_monitored = tf.ConfigProto()
@@ -196,7 +196,7 @@ def main_fun(argv, ctx):
                                                checkpoint_dir=argv.output_path,
                                                save_summaries_steps=1,
                                                save_checkpoint_steps=1*con.nbatches,
-                                               hooks=hooks,
+                                               # hooks=hooks,
                                                summary_dir="tensorboard_%d" % ctx.worker_num
                                                )
         if sys.argv.debug:
@@ -215,99 +215,113 @@ def main_fun(argv, ctx):
         to_reach_step = sys.argv.early_stop_start_step * con.nbatches + last_global_step
         con.lib.getValidBatch(con.valid_pos_h_addr, con.valid_pos_t_addr, con.valid_pos_r_addr, con.valid_neg_h_addr, con.valid_neg_t_addr, con.valid_neg_r_addr)
         local = 0
-
-        while not sess.should_stop():
-            #gives time to other workers to connect
-            if task_index == 0 and local == 0:
-                time.sleep(60)
-            local += 1
-
-            con.sampling()
-
-            feed_dict = {
-                trainModel.batch_h: con.batch_h,
-                trainModel.batch_t: con.batch_t,
-                trainModel.batch_r: con.batch_r,
-                trainModel.batch_y: con.batch_y
-            }
-
-            _, loss, g = sess.run([train_op, trainModel.loss, global_step], feed_dict)
-            print('Global step: {} Epoch: {} Batch: {} loss: {}'.format(g, int( (g-last_global_step) /con.nbatches), int( (g - last_global_step) % con.nbatches), loss))
+        g = last_global_step
 
 
-            ################## EARLY STOP ##################
-            if (task_index != 0) and (g >= to_reach_step):
-                to_reach_step += stopping_step
-                if os.path.exists(sys.argv.output_path+"/stop.txt"):
-                    print('\nEarly stop happened in chief worker\n')
-                    break
+        while g < iterations:
+            try:
+                #gives time to other workers to connect
+                if task_index == 0 and local == 0:
+                    time.sleep(30)
+
+                local += 1
+                con.sampling()
+                feed_dict = {
+                    trainModel.batch_h: con.batch_h,
+                    trainModel.batch_t: con.batch_t,
+                    trainModel.batch_r: con.batch_r,
+                    trainModel.batch_y: con.batch_y
+                }
+
+                _, loss, g = sess.run([train_op, trainModel.loss, global_step], feed_dict)
+                print('Global step: {} Epoch: {} Batch: {} loss: {}'.format(g, int( (g-last_global_step) /con.nbatches), int( (g - last_global_step) % con.nbatches), loss))
 
 
-            if (task_index == 0) and (not sess.should_stop()) and (g >= to_reach_step):
-                while (g >= to_reach_step):
+                ################## EARLY STOP ##################
+                if (task_index != 0) and (g >= to_reach_step):
                     to_reach_step += stopping_step
-
-                ################## ACCURACY ##################
-                feed_dict[trainModel.predict_h] = con.valid_pos_h
-                feed_dict[trainModel.predict_t] = con.valid_pos_t
-                feed_dict[trainModel.predict_r] = con.valid_pos_r
-                res_pos = sess.run(trainModel.predict, feed_dict)
-
-                feed_dict[trainModel.predict_h] = con.valid_neg_h
-                feed_dict[trainModel.predict_t] = con.valid_neg_t
-                feed_dict[trainModel.predict_r] = con.valid_neg_r
-                res_neg = sess.run(trainModel.predict, feed_dict)
-
-                con.lib.getBestThreshold(con.relThresh_addr, res_pos.__array_interface__['data'][0], res_neg.__array_interface__['data'][0])
-                con.lib.test_triple_classification(con.relThresh_addr, res_pos.__array_interface__['data'][0], res_neg.__array_interface__['data'][0], con.acc_addr)
-                acc = con.acc[0]
-
-                if sys.argv.debug:
-                    print("\n[ Early Stop Check (Accuracy) ]")
-                    print("Best Accuracy = %.10f" %(best_acc))
-                    print("Accuracy after run  =  %.10f" %(acc))
-
-                if acc > best_acc:
-                    best_acc = acc
-                    wait_steps_acc = 0
-                    if sys.argv.debug: print("New best Accuracy founded. Wait steps reset.")
-                    best_model_global_step_acc = g
-
-                elif wait_steps_acc < patience:
-                    wait_steps_acc += 1
-                    if sys.argv.debug: print("Wait steps Accuracy incremented: {}\n".format(wait_steps_acc))
+                    if os.path.exists(sys.argv.output_path+"/stop.txt"):
+                        print('\nEarly stop happened in chief worker\n')
+                        break
 
 
-                if wait_steps_acc >= patience:
-                    print('Accuracy early stop. Accuracy has not been improved enough in {} times'.format(patience))
-                    with open(sys.argv.output_path+"/stop.txt", "w") as stop_file:
-                        stop_file.write(str(best_model_global_step_acc)+"\n")
-                    break
-
-                ################## LOSS ##################
-                if sys.argv.debug:
-                    print("\n[ Early Stop Checking (Loss) ]")
-                    print("Best loss = %.10f" %(best_loss))
-                    print("Loss after run  =  %.10f" %(loss))
-
-                if loss < best_loss:
-                    best_loss = loss
-                    wait_steps_loss = 0
-                    if sys.argv.debug: print("New best loss founded. Wait steps reset.")
-                    best_model_global_step_loss = g
-
-                elif wait_steps_loss < patience:
-                    wait_steps_loss += 1
-                    if sys.argv.debug: print("Wait steps loss incremented: {}\n".format(wait_steps_loss))
+                if (task_index == 0) and (g < iterations) and (g >= to_reach_step):
+                    while (g >= to_reach_step):
+                        to_reach_step += stopping_step
 
 
-                if wait_steps_loss >= patience:
-                    print('Loss early stop. Losses has not been improved enough in {} times'.format(patience))
-                    with open(sys.argv.output_path+"/stop.txt", "w") as stop_file:
-                        stop_file.write(str(best_model_global_step_loss)+"\n")
-                    break
+                    ################## ACCURACY ##################
+                    feed_dict[trainModel.predict_h] = con.valid_pos_h
+                    feed_dict[trainModel.predict_t] = con.valid_pos_t
+                    feed_dict[trainModel.predict_r] = con.valid_pos_r
+                    res_pos = sess.run(trainModel.predict, feed_dict)
 
-        return
+                    feed_dict[trainModel.predict_h] = con.valid_neg_h
+                    feed_dict[trainModel.predict_t] = con.valid_neg_t
+                    feed_dict[trainModel.predict_r] = con.valid_neg_r
+                    res_neg = sess.run(trainModel.predict, feed_dict)
+
+
+                    con.lib.getBestThreshold(con.relThresh_addr, res_pos.__array_interface__['data'][0], res_neg.__array_interface__['data'][0])
+                    con.lib.test_triple_classification(con.relThresh_addr, res_pos.__array_interface__['data'][0], res_neg.__array_interface__['data'][0], con.acc_addr)
+
+
+                    acc = con.acc[0]
+
+                    if sys.argv.debug:
+                        print("\n[ Early Stop Check (Accuracy) ]")
+                        print("Best Accuracy = %.10f" %(best_acc))
+                        print("Accuracy after run  =  %.10f" %(acc))
+
+                    if acc > best_acc:
+                        best_acc = acc
+                        wait_steps_acc = 0
+                        if sys.argv.debug: print("New best Accuracy founded. Wait steps reset.")
+                        best_model_global_step_acc = g
+
+                    elif wait_steps_acc < patience:
+                        wait_steps_acc += 1
+                        if sys.argv.debug: print("Wait steps Accuracy incremented: {}\n".format(wait_steps_acc))
+
+
+                    if wait_steps_acc >= patience:
+                        print('Accuracy early stop. Accuracy has not been improved enough in {} times'.format(patience))
+                        with open(sys.argv.output_path+"/stop.txt", "w") as stop_file:
+                            stop_file.write(str(best_model_global_step_acc)+"\n")
+                        break
+
+                    ################## LOSS ##################
+                    if sys.argv.debug:
+                        print("\n[ Early Stop Checking (Loss) ]")
+                        print("Best loss = %.10f" %(best_loss))
+                        print("Loss after run  =  %.10f" %(loss))
+
+                    if loss < best_loss:
+                        best_loss = loss
+                        wait_steps_loss = 0
+                        if sys.argv.debug: print("New best loss founded. Wait steps reset.")
+                        best_model_global_step_loss = g
+
+                    elif wait_steps_loss < patience:
+                        wait_steps_loss += 1
+                        if sys.argv.debug: print("Wait steps loss incremented: {}\n".format(wait_steps_loss))
+
+
+                    if wait_steps_loss >= patience:
+                        print('Loss early stop. Losses has not been improved enough in {} times'.format(patience))
+                        with open(sys.argv.output_path+"/stop.txt", "w") as stop_file:
+                            stop_file.write(str(best_model_global_step_loss)+"\n")
+                        break
+
+            except:
+                print("Exception occured; stopping training")
+                break
+
+        #gives time to chief to stop
+        if task_index != 0:
+            time.sleep(15)
+
+
 
 
 

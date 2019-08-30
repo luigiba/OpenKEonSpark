@@ -55,6 +55,8 @@ void importTrainFiles();
 extern "C"
 void importOntologyFiles();
 
+
+
 struct Parameter {
 	INT id;
 	INT *batch_h;

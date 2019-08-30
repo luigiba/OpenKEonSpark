@@ -302,9 +302,9 @@ void getValidBatch(INT *ph, INT *pt, INT *pr, INT *nh, INT *nt, INT *nr) {
 REAL threshEntire;
 extern "C"
 void getBestThreshold(REAL *relThresh, REAL *score_pos, REAL *score_neg) {
-    REAL interval = 0.01;
     REAL min_score, max_score, bestThresh, tmpThresh, bestAcc, tmpAcc;
     INT n_interval, correct, total;
+
     for (INT r = 0; r < relationTotal; r++) {
         if (validLef[r] == -1) continue;
         total = (validRig[r] - validLef[r] + 1) * 2;
@@ -319,6 +319,7 @@ void getBestThreshold(REAL *relThresh, REAL *score_pos, REAL *score_neg) {
             if(score_neg[i] > max_score) max_score = score_neg[i];
         }
         n_interval = INT((max_score - min_score)/interval);
+
         for (INT i = 0; i <= n_interval; i++) {
             tmpThresh = min_score + i * interval;
             correct = 0;
@@ -345,8 +346,8 @@ extern "C"
 //EDIT
 void test_triple_classification(REAL *relThresh, REAL *score_pos, REAL *score_neg, REAL *acc_addr) {
     testAcc = (REAL *)calloc(relationTotal, sizeof(REAL));
-    INT TP = 0, TN = 0, FP = 0, FN = 0;
     REAL accuracy, precision, recall, fmeasure;
+    INT TP = 0, TN = 0, FP = 0, FN = 0;
 
     for (INT r = 0; r < relationTotal; r++) {
         if (validLef[r] == -1 || testLef[r] ==-1) continue;
@@ -383,6 +384,63 @@ void test_triple_classification(REAL *relThresh, REAL *score_pos, REAL *score_ne
     printf("triple classification f-measure is %lf\n", fmeasure);
 
     acc_addr[0] = 1.0 * (TP + TN) / (TP + TN + FP + FN);
+}
+
+
+extern "C"
+INT get_n_interval(INT r, REAL *score_pos, REAL *score_neg){
+    REAL min_score, max_score;
+    INT n_interval, total;
+    if (validLef[r] == -1) return 0;
+    total = (validRig[r] - validLef[r] + 1) * 2;
+    min_score = score_pos[validLef[r]];
+    if (score_neg[validLef[r]] < min_score) min_score = score_neg[validLef[r]];
+    max_score = score_pos[validLef[r]];
+    if (score_neg[validLef[r]] > max_score) max_score = score_neg[validLef[r]];
+    for (INT i = validLef[r]+1; i <= validRig[r]; i++) {
+        if(score_pos[i] < min_score) min_score = score_pos[i];
+        if(score_pos[i] > max_score) max_score = score_pos[i];
+        if(score_neg[i] < min_score) min_score = score_neg[i];
+        if(score_neg[i] > max_score) max_score = score_neg[i];
+    }
+    return INT((max_score - min_score)/interval);
+}
+
+
+extern "C"
+INT* get_TPFP(INT r, REAL *score_pos, REAL *score_neg, REAL *score_pos_test, REAL *score_neg_test) {
+    REAL min_score, max_score, tmpThresh;
+    INT n_interval, total;
+
+
+    if (validLef[r] == -1) return 0;
+    total = (validRig[r] - validLef[r] + 1) * 2;
+    min_score = score_pos[validLef[r]];
+    if (score_neg[validLef[r]] < min_score) min_score = score_neg[validLef[r]];
+    max_score = score_pos[validLef[r]];
+    if (score_neg[validLef[r]] > max_score) max_score = score_neg[validLef[r]];
+    for (INT i = validLef[r]+1; i <= validRig[r]; i++) {
+        if(score_pos[i] < min_score) min_score = score_pos[i];
+        if(score_pos[i] > max_score) max_score = score_pos[i];
+        if(score_neg[i] < min_score) min_score = score_neg[i];
+        if(score_neg[i] > max_score) max_score = score_neg[i];
+    }
+    n_interval = INT((max_score - min_score)/interval);
+
+
+    INT* TPFPs = new INT[(n_interval+1)*2];
+    for (INT i = 0; i <= n_interval; i++) {
+        INT TP = 0, FP = 0;
+        tmpThresh = min_score + i * interval;
+        for (INT i = testLef[r]; i <= testRig[r]; i++) {
+            if (score_pos_test[i] <= tmpThresh) TP++;
+            if (score_neg_test[i] <= tmpThresh) FP++;
+        }
+        TPFPs[i] = TP;
+        TPFPs[i + n_interval+1] = FP;
+    }
+
+    return TPFPs;
 }
 
 

@@ -1,5 +1,6 @@
 #coding:utf-8
 import numpy as np
+import matplotlib.pyplot as plt
 import tensorflow as tf
 import os
 import ctypes
@@ -44,6 +45,12 @@ class Config(object):
             self.lib.getBestThreshold.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
             self.lib.test_triple_classification.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
 
+            #ROC
+            self.lib.get_n_interval.argtypes = [ctypes.c_int64, ctypes.c_void_p, ctypes.c_void_p]
+            self.lib.get_n_interval.restype = ctypes.c_int64
+            self.lib.get_TPFP.argtypes = [ctypes.c_int64, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+            self.lib.get_TPFP.restype = ctypes.POINTER( ctypes.c_int64 * 2 )
+
             #set other parameters
             self.in_path = None
             self.test_log_path = None
@@ -54,7 +61,7 @@ class Config(object):
             self.rel_size = self.hidden_size
             self.train_times = 0
             self.margin = 1.0
-            self.nbatches = 100
+            self.nbatches = 0
             self.negative_ent = 1
             self.negative_rel = 0
             self.workThreads = 8
@@ -851,6 +858,60 @@ class Config(object):
                 test_time_elapsed = time.time() - test_time_start
                 print("\nElapsed test time (seconds): {}".format(test_time_elapsed))
 
+
+    def plot_roc(self, rel_index, fig_name=None):
+        if self.importName != None:
+            self.restore_tensorflow()
+        self.init_triple_classification()
+
+        self.lib.getValidBatch(self.valid_pos_h_addr, self.valid_pos_t_addr, self.valid_pos_r_addr, self.valid_neg_h_addr, self.valid_neg_t_addr, self.valid_neg_r_addr)
+        res_pos_valid = self.test_step(self.valid_pos_h, self.valid_pos_t, self.valid_pos_r)
+        res_neg_valid = self.test_step(self.valid_neg_h, self.valid_neg_t, self.valid_neg_r)
+
+        self.lib.getTestBatch(self.test_pos_h_addr, self.test_pos_t_addr, self.test_pos_r_addr, self.test_neg_h_addr, self.test_neg_t_addr, self.test_neg_r_addr)
+        res_pos_test = self.test_step(self.test_pos_h, self.test_pos_t, self.test_pos_r)
+        res_neg_test = self.test_step(self.test_neg_h, self.test_neg_t, self.test_neg_r)
+
+        n_intervals = self.lib.get_n_interval(rel_index, res_pos_valid.__array_interface__['data'][0], res_neg_valid.__array_interface__['data'][0])
+        self.lib.get_TPFP.restype = ctypes.POINTER( ctypes.c_int64 * ((n_intervals+1)*2) )
+        res = [j for j in self.lib.get_TPFP(rel_index, res_pos_valid.__array_interface__['data'][0], res_neg_valid.__array_interface__['data'][0], res_pos_test.__array_interface__['data'][0], res_neg_test.__array_interface__['data'][0]).contents]
+
+        TPR = []
+        FPR = []
+
+        if res[0] != 0 or res[0+n_intervals+1] != 0:
+            TPR.append(0)
+            FPR.append(0)
+
+
+        for i in range(0, n_intervals+1):
+            TPR.append(res[i])
+            FPR.append(res[i+n_intervals+1])
+
+        if TPR[len(TPR)-1] != len(res_pos_test.flatten()) or FPR[len(FPR)-1] != len(res_neg_test.flatten()):
+            TPR.append(len(res_pos_test.flatten()))
+            FPR.append(len(res_neg_test.flatten()))
+
+
+        for i in range(len(TPR)): TPR[i] /= TPR[-1]
+        for i in range(len(FPR)): FPR[i] /= FPR[-1]
+
+        auc = np.trapz(TPR, FPR)
+
+        plt.figure()
+        lw=2
+        plt.plot(FPR, TPR, color='darkorange', lw=lw, label='ROC curve (area = %0.3f)' % auc)
+        plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate (FPR)')
+        plt.ylabel('True Positive Rate (TPR)')
+        plt.title('ROC Curve')
+        plt.legend(loc="lower right")
+        if fig_name == None or fig_name == '':
+            plt.show()
+        else:
+            plt.savefig(fig_name)
 
 
     def predict_head_entity(self, t, r, k):

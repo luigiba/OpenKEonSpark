@@ -111,6 +111,10 @@ extern "C"
 void setBern(INT con) {
 	bernFlag = con;
 }
+/*
+============================================================
+*/
+REAL interval = 0.01;
 
 
 #endif

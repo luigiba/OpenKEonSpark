@@ -16,10 +16,10 @@ import os
 TARGET_RELATION = '<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>'
 
 #dataset containing all the triples with only the target relation
-path_t = "instancetype_en.nt"
+path_t = "/home/luigi/Desktop/DBpedia/instancetype_en.nt"
 
 #dataset containing all the other triples (except the target relation)
-path_r = "newstrictmappingbased_en.nt"
+path_r = "/home/luigi/Desktop/DBpedia/newstrictmappingbased_en.nt"
 
 #path which contains the class hierarchy
 path_h = "class_hierarchy.txt"
@@ -35,7 +35,7 @@ SKIP_DATA_PROPERTY = True
 GENERATE_ONTOLOGY_FILES = True
 
 #number of batches to split the dataset into
-N_BATCHES = 5
+N_BATCHES = 1
 
 #percentage of triples with target relation for each batch test set 
 TEST_SET_PERCENTAGE = 10
@@ -59,7 +59,7 @@ type_tails = set()
 type_tails_dict = {}
 
 
-print(" ===== Reading test triples ===== ")
+print(" ===== Reading TARGET triples ===== ")
 with open(path_t, "r") as f:
     lines_t = f.readlines()
     
