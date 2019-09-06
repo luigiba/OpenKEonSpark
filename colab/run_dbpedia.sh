@@ -1,18 +1,7 @@
 #this is an example of script that can be used on google colab to train the embedding and evaluate them
 # the link prediction evaluation will be performed only for the last batch
 # for the other batch it will be performed only triple classification evaluation
-#before starting the script:
-#   run split.py to set the dataset in a properly format
-#   set environment variables, e.g.:
-#     $JAVA_HOME = "/usr/lib/jvm/java-8-openjdk-amd64"
-#     $SPARK_WORKER_INSTANCES = '3'
-#     $PYSPARK_PYTHON = '/usr/bin/python3'
-#     $CUDA_VISIBLE_DEVICES = "0"
-#     $CORES_PER_WORKER = "1"
-#     $MEMORY_PER_WORKER = "4g"
-#     $LIB_CUDA = "/usr/local/cuda-10.0/lib64"
-#     $WORK_DIR_PREFIX = "/content/OpenKEonSpark"
-#     $SPARK_HOME = "/content/spark-2.1.1-bin-hadoop2.7"
+#before starting the script: run the commands in commands.txt
 
 
 echo "====================================== Parameters ======================================"

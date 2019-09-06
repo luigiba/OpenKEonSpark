@@ -30,8 +30,8 @@ target_rel_index = None
 dataset_path = sys.argv[1]
 model_path = sys.argv[2]
 cpp_path = sys.argv[3]
-dim = sys.argv[3]
-model = sys.argv[4]
+dim = sys.argv[4]
+model = sys.argv[5]
 if (len(sys.argv) >= 7): target_rel_index = sys.argv[6]
 
 

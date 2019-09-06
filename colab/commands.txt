@@ -34,7 +34,7 @@ os.environ["LIB_CUDA"] = "/usr/local/cuda-10.0/lib64"
 os.environ["WORK_DIR_PREFIX"] = "/content/OpenKEonSpark"
 os.environ["SPARK_HOME"] = "/content/spark-2.1.1-bin-hadoop2.7"
 
-#execute
+#execute train-evaluate pipeline
 !bash $WORK_DIR_PREFIX/colab/run_dbpedia.sh 10 64 "TransE" 0.00001
 
 

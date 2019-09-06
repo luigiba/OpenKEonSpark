@@ -39,9 +39,6 @@ Moreover, inside each sub-batch folder i, it will be created the folder "model" 
         percentage of triples with target relation/s for each batch test set
     VALIDATION_SET_PERCENTAGE
         percentage of triples with target relation/s for each batch validation set
-
-
-
 """
 
 import math
