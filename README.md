@@ -1,6 +1,7 @@
 
 # OpenKEonSpark  
-
+This is a distributed version of the framework OpenKE (https://github.com/thunlp/OpenKE) using the library TensorFlowOnSpark (https://github.com/yahoo/TensorFlowOnSpark).  
+  
 - [OpenKEonSpark](#openkeonspark)
   * [Overview](#overview)
   * [Installation](#installation)
@@ -22,6 +23,9 @@
   * [How to run the distributed application?](#how-to-run-the-distributed-application-)
 
 <small><i><a href='http://ecotrust-canada.github.io/markdown-toc/'>Table of contents generated with markdown-toc</a></i></small>
+
+
+
 
   
   
