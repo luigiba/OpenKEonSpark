@@ -34,7 +34,7 @@ This is a distributed version of the framework OpenKE (https://github.com/thunlp
 **OpenKE** is an Efficient implementation based on TensorFlow for knowledge representation learning.  C++ is used to implement some underlying operations such as data preprocessing and negative sampling. Knowledege Graph Embedding models (TransE, TransH, TransR, TransD) are implemented using TensorFlow with Python interfaces so that there is a convenient platform to run models on GPUs and CPUs.   
   
 **OpenKEonSpark** is the is the distributed version of OpenKE using the library **TensorflowOnSpark** (which allows to distribute existing Tensorflow application on Spark). 
-With OpenKEonSpark can be performed both distributed training and evaluation of **Translational Distance Models**.
+With OpenKEonSpark can be performed both distributed training and evaluation of **Translational Distance Models** (TransE, TransH, TransR, TransD).
 The motivations that have driven this project are the following: 
   1. Create a tool which efficiently allows to train and evaluate knowledge graph embedding, distributing the job among a set of resources;  
   2. As in Big data scenarios, the model created in the first point should be updatable as new batch of data arrives.  
