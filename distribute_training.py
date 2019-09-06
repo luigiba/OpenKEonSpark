@@ -43,12 +43,10 @@ def get_conf(argv=None):
     else: con.set_test_link_prediction(True)
 
     con.set_train_times(argv.train_times)
-    con.set_nbatches(argv.n_batches)
+    con.set_nbatches(argv.n_mini_batches)
     con.set_alpha(argv.alpha)
     con.set_margin(argv.margin)
-
-    if argv.bern_flag:
-        con.set_bern(1)
+    con.set_bern(argv.bern_flag)
 
     if argv.ent_dimension != 0 and argv.rel_dimension != 0:
         con.set_ent_dimension(argv.ent_dimension)
@@ -109,7 +107,8 @@ def create_model(con):
 
 def create_model_evaluation(con):
     '''
-    create the model using the Config parameters
+    create the model using the Config parameters for evaluation mode
+    creates only the model and gloabal step
     '''
     with tf.variable_scope("", reuse=None, initializer = tf.contrib.layers.xavier_initializer(uniform = True)):
         trainModel = con.model(config = con)

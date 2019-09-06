@@ -17,8 +17,6 @@ Triple *trainHead;
 Triple *trainTail;
 Triple *trainRel;
 
-
-//EDIT
 Triple *trainList_no;   //data structure containing training triples not ordered
 
 
@@ -30,7 +28,7 @@ void importTrainFiles() {
 
 	printf("The toolkit is importing datasets.\n");
 	FILE *fin;
-	FILE *fin_; //EDIT
+	FILE *fin_;
 	int tmp;
 
     //read relations
@@ -58,7 +56,7 @@ void importTrainFiles() {
 	/**
     * EDIT
     * check if new batch file exists
-    * if it exists get only new batch size
+    * if it exists get only new batch size (another script has already incorporeted the new triples into train2id.txt)
     **/
     fin_ = fopen((inPath + "batch2id.txt").c_str(), "r");
     if (fin_ != nullptr){
@@ -76,7 +74,7 @@ void importTrainFiles() {
 		return;
 	}
 	tmp = fscanf(fin, "%ld", &trainTotal);
-	trainTotal_ = trainTotal;           //traingTotal_ contains # training triples counting duplicates, too
+	trainTotal_ = trainTotal;           //traingTotal_ contains # training triples counting duplicates too
 	printf("The total of train triples is %ld.\n", trainTotal);
 
 
@@ -87,7 +85,7 @@ void importTrainFiles() {
 	trainRel = (Triple *)calloc(trainTotal, sizeof(Triple));
 	freqRel = (INT *)calloc(relationTotal, sizeof(INT));
 	freqEnt = (INT *)calloc(entityTotal, sizeof(INT));
-	//EDIT
+	//not ordered
     trainList_no = (Triple *)calloc(trainTotal, sizeof(Triple));    //not ordered
 
 	for (INT i = 0; i < trainTotal; i++) {
@@ -95,7 +93,7 @@ void importTrainFiles() {
 		tmp = fscanf(fin, "%ld", &trainList[i].t);
 		tmp = fscanf(fin, "%ld", &trainList[i].r);
 
-		//EDIT
+
         trainList_no[i].h = trainList[i].h;
         trainList_no[i].t = trainList[i].t;
         trainList_no[i].r = trainList[i].r;

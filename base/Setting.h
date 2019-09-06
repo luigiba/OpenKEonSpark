@@ -114,7 +114,8 @@ void setBern(INT con) {
 /*
 ============================================================
 */
-REAL interval = 0.01;
+
+REAL interval = 0.01;   //used to compute thresholds during triple classification task
 
 
 #endif

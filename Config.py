@@ -25,7 +25,7 @@ class Config(object):
         if init_new_entities == False:
             #C library
             if cpp_lib_path == None:
-                cpp_lib_path = '/home/luigi/IdeaProjects/OpenKEonSpark/release/Base.so'
+                cpp_lib_path = './release/Base.so'
             base_file = os.path.abspath(cpp_lib_path)
             self.lib = ctypes.cdll.LoadLibrary(base_file)
             self.lib.sampling.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int64, ctypes.c_int64, ctypes.c_int64]

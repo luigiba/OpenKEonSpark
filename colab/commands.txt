@@ -1,4 +1,6 @@
 #commands to run OpenKEonSpark on Google Colaboratory platform
+#before running, create a folder in your Google Drive named DBpedia
+#uplod in the folder the zip archive containing the dataset given as output from generate.py
 
 #install
 !apt-get install openjdk-8-jdk-headless -qq > /dev/null
@@ -15,12 +17,10 @@ drive.mount('/content/drive')
 
 #clone project
 !git clone https://github.com/luigiba/OpenKEonSpark.git
-!mv OpenKEonSpark/gpu_info.py /usr/local/lib/python3.6/dist-packages/tensorflowonspark/gpu_info.py
+!mv OpenKEonSpark/colab/gpu_info.py /usr/local/lib/python3.6/dist-packages/tensorflowonspark/gpu_info.py
 
 #unzip dataset
-!unzip /content/drive/My\ Drive/DBpedia/5.zip -d /content/drive/My\ Drive/DBpedia/
 !unzip /content/drive/My\ Drive/DBpedia/10.zip -d /content/drive/My\ Drive/DBpedia/
-!unzip /content/drive/My\ Drive/DBpedia/15.zip -d /content/drive/My\ Drive/DBpedia/
 
 #set env vars
 import os
@@ -35,9 +35,7 @@ os.environ["WORK_DIR_PREFIX"] = "/content/OpenKEonSpark"
 os.environ["SPARK_HOME"] = "/content/spark-2.1.1-bin-hadoop2.7"
 
 #execute
-!bash $WORK_DIR_PREFIX/run_dbpedia.sh 5 64 "TransE" 0.0001
-!bash $WORK_DIR_PREFIX/run_dbpedia.sh 10 64 "TransE" 0.0001
-!bash $WORK_DIR_PREFIX/run_dbpedia.sh 15 64 "TransE" 0.0001
+!bash $WORK_DIR_PREFIX/colab/run_dbpedia.sh 10 64 "TransE" 0.00001
 
 
 

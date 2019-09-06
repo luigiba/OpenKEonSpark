@@ -68,7 +68,9 @@ struct Parameter {
 	INT negRelRate;
 };
 
-
+/*
+ * feed batch with training triples / corrupted triples
+*/
 void* getBatch(void* con) {
 	Parameter *para = (Parameter *)(con);
 	INT id = para -> id;
@@ -94,7 +96,7 @@ void* getBatch(void* con) {
 		INT i;
 
 		/**
-		* select batch triple / train triple
+		* select new batch triple / train triple
 		**/
 		if (newBatchTotal > 0){
             i = rand_max_range(id, trainTotal_ - newBatchTotal, trainTotal_);
@@ -137,12 +139,13 @@ void* getBatch(void* con) {
 		}
 	}
 
-
 	pthread_exit(NULL);
 }
 
 
-
+/*
+ * Sample a batch to use during training
+*/
 extern "C"
 void sampling(INT *batch_h, INT *batch_t, INT *batch_r, REAL *batch_y, INT batchSize, INT negRate = 1, INT negRelRate = 0) {
 	pthread_t *pt = (pthread_t *)malloc(workThreads * sizeof(pthread_t));

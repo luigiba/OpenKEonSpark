@@ -3,45 +3,61 @@
 """
 Created on Sat Jun 29 20:10:44 2019
 
-You can use this script to split your dataset into batches 
-to feed into OpenKEonSpark
+
+You can use this script to
+    assign numerical identifiers to resources
+    split data into training/test/validation set
+    split data into batches
+    generate ontology_constrain file
+This script will output a directory which is named as n, where n is number of batches used to split the dataset.
+Inside the directory there will be n-1 (named from 0 to n-1) sub-folders. Each sub-folder contains a different batch.
+Moreover, inside each sub-batch folder i, it will be created the folder "model" that can be used to save the model up to batch i.
 
 @author: Luigi Baldari
+
+@:param
+    TARGET_RELATION
+        Specify in this array the target relation/s
+        Training set will contain all the relations (target included)
+        test set and validation set will contain ontly target relation/s
+    path_t
+        Path to N-Triples dataset containing all the triples with only the target relation/s
+    path_r
+        Path to N-Triples dataset containing all the other triples (except the target relation/s)
+    path_h
+        Path which contains the class hierarchy (from which the ontology_constrain.txt will be created)
+        The root node (i.e. the first line of the file) contains the most general class. As
+        new specific classes are met, a new level of indentation has to be added to the new line.
+        In this way the classes which have the same number of tabs are on the same level of the tree.
+    SKIP_DATA_PROPERTY
+        if set to True, triples with Data Propertiy relations will be discarded and only triples with Object Propertiy relations will be taken into account
+    GENERATE_ONTOLOGY_FILES
+        if set to True, it will generate ontology_constrain.txt
+    N_BATCHES
+        number of batches to split the dataset into
+    TEST_SET_PERCENTAGE
+        percentage of triples with target relation/s for each batch test set
+    VALIDATION_SET_PERCENTAGE
+        percentage of triples with target relation/s for each batch validation set
+
+
+
 """
+
 import math
 from random import shuffle
 import os
 
-#The relation of interest
-TARGET_RELATION = '<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>'
 
-#dataset containing all the triples with only the target relation
+TARGET_RELATION = ['<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>']
 path_t = "/home/luigi/Desktop/DBpedia/instancetype_en.nt"
-
-#dataset containing all the other triples (except the target relation)
 path_r = "/home/luigi/Desktop/DBpedia/newstrictmappingbased_en.nt"
-
-#path which contains the class hierarchy
 path_h = "class_hierarchy.txt"
-
-#path that will contains the ontology constraints for each batch
-path_ont_con = "ontology_constrain.txt"
-
-#if set to True, triples with Data Propertiy relations will be discarded
-# only triples with Object Propertiy relations will be taken into account
 SKIP_DATA_PROPERTY = True
-
-#if set to True, it will generate ontology files constraints
 GENERATE_ONTOLOGY_FILES = True
-
-#number of batches to split the dataset into
-N_BATCHES = 1
-
-#percentage of triples with target relation for each batch test set 
+N_BATCHES = 10
 TEST_SET_PERCENTAGE = 10
-
-#percentage of triples with target relation for each batch validation set 
-VALIDATION_SET_PERCENTAGE = 10 
+VALIDATION_SET_PERCENTAGE = 10
 
 
 
@@ -187,7 +203,7 @@ for b in range(0, N_BATCHES):
     try: os.mkdir(str(N_BATCHES)+'/'+str(b))
     except: pass
     
-    try: os.mkdir((str(N_BATCHES)+'/'+str(b)+'/model'))
+    try: os.mkdir((str(N_BATCHES)+'/'+str(b)+'/model'))     #create dir where the model will be stored
     except: pass
     
     if b+1 == N_BATCHES: rig = n_triples
@@ -231,7 +247,7 @@ for b in range(0, N_BATCHES):
     
     if GENERATE_ONTOLOGY_FILES:
         print(" LOG:\tGenerating ontology constrain file")
-        with open("./"+str(N_BATCHES)+'/'+str(b)+"/"+path_ont_con, 'w') as f_ont_con:
+        with open("./"+str(N_BATCHES)+'/'+str(b)+"/ontology_constrain.txt", 'w') as f_ont_con:
             classes_len = 0
             for key in classes.keys():
                 if entities[key] <= entities[ent]: 
@@ -272,7 +288,7 @@ for b in range(0, N_BATCHES):
     test_triples_ids = []
     remaining = []
     for i in batch_triples_ids:
-        if triples[i].split(" ")[1].strip() == TARGET_RELATION:
+        if triples[i].split(" ")[1].strip() in TARGET_RELATION:
             test_triples_ids.append(i)
         else:
             remaining.append(i)
