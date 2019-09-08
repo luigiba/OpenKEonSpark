@@ -2,6 +2,8 @@
 # the link prediction evaluation will be performed only for the last batch
 # for the other batch it will be performed only triple classification evaluation
 #before starting the script: run the commands in commands.txt
+#This script has been written in order to be recoverable: if your Google Colab crashes, you can restart the training/evaluation
+#from the last checkpoint.
 
 
 echo "====================================== Parameters ======================================"
@@ -28,7 +30,7 @@ for i in `seq 0 $m`
 do
   #restore link prediction evaluation if evaluation checkpoints have been founded
   if [ -f /content/drive/My\ Drive/DBpedia/$n/$i/model/thread0 ]; then
-    echo "====================================== Test for batch $i ======================================"
+    echo "====================================== Restart link prediction evaluation for batch $i ======================================"
 	  $SPARK_HOME/bin/spark-submit --master spark://$(hostname):7077 \
     --py-files $WORK_DIR_PREFIX/distribute_training.py,$WORK_DIR_PREFIX/Config.py,$WORK_DIR_PREFIX/Model.py,$WORK_DIR_PREFIX/TransE.py,$WORK_DIR_PREFIX/Model.py,$WORK_DIR_PREFIX/TransH.py,$WORK_DIR_PREFIX/Model.py,$WORK_DIR_PREFIX/TransR.py,$WORK_DIR_PREFIX/Model.py,$WORK_DIR_PREFIX/TransD.py \
     --driver-library-path=$LIB_CUDA --conf spark.dynamicAllocation.enabled=false --conf spark.task.cpus=$CORES_PER_WORKER --executor-memory $MEMORY_PER_WORKER --num-executors $SPARK_WORKER_INSTANCES \
@@ -48,7 +50,7 @@ do
 
 
   if [ -f /content/drive/My\ Drive/DBpedia/$n/$i/model/checkpoint ]; then
-    echo "====================================== Test for batch $i ======================================"
+    echo "====================================== Start Link Prediction evaluation for batch $i ======================================"
     if [ $i -eq $m ]; then
 	    $SPARK_HOME/bin/spark-submit --master spark://$(hostname):7077 \
     --py-files $WORK_DIR_PREFIX/distribute_training.py,$WORK_DIR_PREFIX/Config.py,$WORK_DIR_PREFIX/Model.py,$WORK_DIR_PREFIX/TransE.py,$WORK_DIR_PREFIX/Model.py,$WORK_DIR_PREFIX/TransH.py,$WORK_DIR_PREFIX/Model.py,$WORK_DIR_PREFIX/TransR.py,$WORK_DIR_PREFIX/Model.py,$WORK_DIR_PREFIX/TransD.py \
@@ -97,7 +99,7 @@ do
 	cp $WORK_DIR_PREFIX/res_spark/* /content/drive/My\ Drive/DBpedia/$n/$i/model/
 
 	
-	echo "====================================== Test for batch $i ======================================"
+	echo "====================================== Start evaluation for batch $i ======================================"
 	if [ $i -eq $m ]; then
 	  $SPARK_HOME/bin/spark-submit --master spark://$(hostname):7077 \
     --py-files $WORK_DIR_PREFIX/distribute_training.py,$WORK_DIR_PREFIX/Config.py,$WORK_DIR_PREFIX/Model.py,$WORK_DIR_PREFIX/TransE.py,$WORK_DIR_PREFIX/Model.py,$WORK_DIR_PREFIX/TransH.py,$WORK_DIR_PREFIX/Model.py,$WORK_DIR_PREFIX/TransR.py,$WORK_DIR_PREFIX/Model.py,$WORK_DIR_PREFIX/TransD.py \

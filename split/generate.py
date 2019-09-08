@@ -4,14 +4,15 @@
 Created on Sat Jun 29 20:10:44 2019
 
 
-You can use this script to
+Starting from your N-triples files, you can use this script to
     assign numerical identifiers to resources
     split data into training/test/validation set
     split data into batches
     generate ontology_constrain file
+
 This script will output a directory which is named as n, where n is number of batches used to split the dataset.
 Inside the directory there will be n-1 (named from 0 to n-1) sub-folders. Each sub-folder contains a different batch.
-Moreover, inside each sub-batch folder i, it will be created the folder "model" that can be used to save the model up to batch i.
+Moreover, inside each sub-batch folder i, it will be created the folder "model" that will be used to save the model up to batch i.
 
 @author: Luigi Baldari
 
@@ -26,9 +27,10 @@ Moreover, inside each sub-batch folder i, it will be created the folder "model" 
         Path to N-Triples dataset containing all the other triples (except the target relation/s)
     path_h
         Path which contains the class hierarchy (from which the ontology_constrain.txt will be created)
-        The root node (i.e. the first line of the file) contains the most general class. As
-        new specific classes are met, a new level of indentation has to be added to the new line.
+        The root node (i.e. the first line of the class hierarchy file) contains the most general class.
+        As new specific classes are met, a new level of indentation has to be added to the new line.
         In this way the classes which have the same number of tabs are on the same level of the tree.
+        The file class_hierachy.txt contains an example of how the class hierarchy should be formatted to be fed into this scipt
     SKIP_DATA_PROPERTY
         if set to True, triples with Data Propertiy relations will be discarded and only triples with Object Propertiy relations will be taken into account
     GENERATE_ONTOLOGY_FILES
