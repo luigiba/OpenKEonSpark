@@ -9,6 +9,7 @@ Starting from your N-triples files, you can use this script to
     split data into training/test/validation set
     split data into batches
     generate ontology_constrain file
+    print useful statistics
 
 This script will output a directory which is named as n, where n is number of batches used to split the dataset.
 Inside the directory there will be n-1 (named from 0 to n-1) sub-folders. Each sub-folder contains a different batch.
@@ -188,7 +189,8 @@ n_triples = len(triples)
 BATCH_SIZE = math.floor(n_triples / N_BATCHES)
 
 print(" LOG:\tNumber of triples: {}\n".format(n_triples))
-
+print(" LOG:\tNumber of entities: {}\n".format(len(entities.keys())))
+print(" LOG:\tNumber of relations: {}\n".format(len(relations.keys())))
 
 
 lef = 0
@@ -356,7 +358,10 @@ for b in range(0, N_BATCHES):
             r = str(relations[s[1].strip()])
             f.write(h+' '+t+' '+r+'\n')
     
-          
+    
+    
+    
+    
     print()
     lef = rig
     
@@ -366,6 +371,119 @@ with open("./"+str(N_BATCHES)+"/0/relation2id.txt", 'w') as f:
     f.write(str(len(relations.items()))+"\n")
     for key, value in relations.items():
         f.write(key + "\t" + str(value) + "\n")
+
+
+###############################################################################
+
+print("\n ===== Relations structure statistics ===== ")
+
+for b in range(N_BATCHES):
+    print(" ===== Batch {} ===== ".format(b))
+    
+    lef = {}
+    rig = {}
+    
+    if b == 0: triple = open( "./"+str(N_BATCHES)+'/'+str(b)+"/train2id.txt", "r")
+    else: triple = open( "./"+str(N_BATCHES)+'/'+str(b)+"/batch2id.txt", "r")
+    
+    if b == 0: valid = open("./"+str(N_BATCHES)+'/'+str(b)+"/valid2id.txt", "r")
+    else: valid = open("./"+str(N_BATCHES)+'/'+str(b)+"/batchValid2id.txt", "r")
+    
+    if b == 0: test = open("./"+str(N_BATCHES)+'/'+str(b)+"/test2id.txt", "r")
+    else: test = open("./"+str(N_BATCHES)+'/'+str(b)+"/batchTest2id.txt", "r")
+    
+    tot = (int)(triple.readline())
+    for i in range(tot):
+    	content = triple.readline()
+    	h,t,r = content.strip().split()
+    	if not (h,r) in lef:
+    		lef[(h,r)] = []
+    	if not (r,t) in rig:
+    		rig[(r,t)] = []
+    	lef[(h,r)].append(t)
+    	rig[(r,t)].append(h)
+    
+    tot = (int)(valid.readline())
+    for i in range(tot):
+    	content = valid.readline()
+    	h,t,r = content.strip().split()
+    	if not (h,r) in lef:
+    		lef[(h,r)] = []
+    	if not (r,t) in rig:
+    		rig[(r,t)] = []
+    	lef[(h,r)].append(t)
+    	rig[(r,t)].append(h)
+    
+    tot = (int)(test.readline())
+    for i in range(tot):
+    	content = test.readline()
+    	h,t,r = content.strip().split()
+    	if not (h,r) in lef:
+    		lef[(h,r)] = []
+    	if not (r,t) in rig:
+    		rig[(r,t)] = []
+    	lef[(h,r)].append(t)
+    	rig[(r,t)].append(h)
+    
+    test.close()
+    valid.close()
+    triple.close()
+    
+    
+    rellef = {}
+    totlef = {}
+    relrig = {}
+    totrig = {}
+    
+    for i in lef:
+    	if not i[1] in rellef:
+    		rellef[i[1]] = 0
+    		totlef[i[1]] = 0
+    	rellef[i[1]] += len(lef[i])
+    	totlef[i[1]] += 1.0
+    
+    for i in rig:
+    	if not i[0] in relrig:
+    		relrig[i[0]] = 0
+    		totrig[i[0]] = 0
+    	relrig[i[0]] += len(rig[i])
+    	totrig[i[0]] += 1.0
+        
+        
+    
+    for file in {"batch2id.txt", "batchTest2id.txt", "batchValid2id.txt"}:
+        if b == 0 and file == "batch2id.txt": file = "train2id.txt"
+        if b == 0 and file == "batchTest2id.txt": file = "test2id.txt"
+        if b == 0 and file == "batchValid2id.txt": file = "valid2id.txt"
+        
+        s11=0
+        s1n=0
+        sn1=0
+        snn=0
+        f = open("./"+str(N_BATCHES)+'/'+str(b)+"/"+file, "r")
+        tot = (int)(f.readline())
+        for i in range(tot):
+        	content = f.readline()
+        	h,t,r = content.strip().split()
+        	rign = rellef[r] / totlef[r]
+        	lefn = relrig[r] / totrig[r]
+        	if (rign <= 1.5 and lefn <= 1.5):
+        		s11+=1
+        	if (rign > 1.5 and lefn <= 1.5):
+        		s1n+=1
+        	if (rign <= 1.5 and lefn > 1.5):
+        		sn1+=1
+        	if (rign > 1.5 and lefn > 1.5):
+        		snn+=1
+        f.close()
+        
+        print(" LOG:\t# of 1-to-1 triples in {}:{}".format(file, s11))
+        print(" LOG:\t# of 1-to-N triples in {}:{}".format(file, s1n))
+        print(" LOG:\t# of N-to-1 triples in {}:{}".format(file, sn1))
+        print(" LOG:\t# of N-to-N triples in {}:{}".format(file, snn))
+        print()
+        
+        
 
 
 
