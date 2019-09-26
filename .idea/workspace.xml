@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="0f79fb12-bf2b-474d-8da4-e622edb018dd" name="Default Changelist" comment="" />
+    <list default="true" id="0f79fb12-bf2b-474d-8da4-e622edb018dd" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/distribute_training.py" beforeDir="false" afterPath="$PROJECT_DIR$/distribute_training.py" afterDir="false" />
+    </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
