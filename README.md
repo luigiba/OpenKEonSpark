@@ -1,6 +1,6 @@
 
 # OpenKEonSpark  
-This is a distributed version of the framework OpenKE (https://github.com/thunlp/OpenKE) using the library TensorFlowOnSpark (https://github.com/yahoo/TensorFlowOnSpark).  
+This is a distributed version of the framework OpenKE (https://github.com/thunlp/OpenKE) using the library TensorFlowOnSpark (https://github.com/yahoo/TensorFlowOnSpark version 1.4.4).  
 Please refer to https://github.com/tensorflow/examples/blob/master/community/en/docs/deploy/distributed.md to have an overview about how Distributed Tensorflow training works.
   
   
